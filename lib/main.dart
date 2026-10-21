@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'shared/database/db_init.dart';
 import 'shared/routes/app_route.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await GymDatabase.instance.database;
   runApp(ProviderScope(child: const MyApp()));
 }
 

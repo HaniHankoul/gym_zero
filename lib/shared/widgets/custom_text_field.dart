@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 import '../theme/app_theme.dart';
 
@@ -24,40 +25,43 @@ class CustomTextField extends StatelessWidget {
   final VoidCallback? prefixCallBack;
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: TextFormField(
-        controller: controller,
-        onTap: onTap,
-        readOnly: readOnly,
-        onFieldSubmitted: onFieldSubmitted,
-        decoration: InputDecoration(
-          contentPadding: EdgeInsets.zero,
-          hintText: hintText,
-          hintStyle: TextStyle(
+    return TextFormField(
+      cursorColor: AppThemeDark.primary,
+      style: TextStyle(color: AppThemeDark.textWhite, fontFamily: "cairo"),
+      controller: controller,
+      onTap: onTap,
+      readOnly: readOnly,
+      onFieldSubmitted: onFieldSubmitted,
+      decoration: InputDecoration(
+        hintText: hintText,
+        hintStyle: TextStyle(color: AppThemeDark.primary, fontFamily: "cairo"),
+        // prefixIcon: IconButton(
+        //   onPressed: prefixCallBack,
+        //   icon: Icon(Icons.search, color: AppThemeDark.primary, size: 26),
+        // ),
+        suffixIcon: SizedBox(
+          height: 1,
+          child: HugeIcon(
+            icon: icon,
+            size: 15,
             color: AppThemeDark.primary,
-            fontFamily: "cairo",
+            strokeWidth: 1,
           ),
-          prefixIcon: IconButton(
-            onPressed: prefixCallBack,
-            icon: Icon(Icons.search, color: AppThemeDark.primary, size: 26),
-          ),
-          suffixIcon: suffixIcon,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: AppThemeDark.primary),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: AppThemeDark.primary, width: 2),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: AppThemeDark.primary, width: 3),
-          ),
-          filled: true,
-          fillColor: AppThemeDark.primaryLight,
         ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: AppThemeDark.primary),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: AppThemeDark.primary, width: 2),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: AppThemeDark.primary, width: 3),
+        ),
+        filled: true,
+        fillColor: AppThemeDark.primaryLight,
       ),
     );
   }

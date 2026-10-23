@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gym_zero/providers/navigation_provider.dart';
 import 'package:gym_zero/shared/theme/app_theme.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hugeicons/hugeicons.dart';
 
 import '../../constants/general_sizes.dart';
@@ -10,13 +9,11 @@ import '../../constants/general_sizes.dart';
 class NavigationElements extends ConsumerWidget {
   final String title;
   final List<List<dynamic>> icon;
-  final String path;
   final NavigationSection section;
 
   const NavigationElements({
     required this.title,
     required this.icon,
-    required this.path,
     required this.section,
     super.key,
   });
@@ -30,7 +27,6 @@ class NavigationElements extends ConsumerWidget {
       height: 50,
       onPressed: () {
         ref.read(navigationProvider.notifier).select(section);
-        context.go(path);
       },
       hoverElevation: 2,
       splashColor: Colors.grey,

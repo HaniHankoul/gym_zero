@@ -77,7 +77,6 @@ class NavigationPanel extends StatelessWidget {
             NavigationElements(
               title: item.title,
               icon: item.icon,
-              path: item.path,
               section: item.section,
             ),
             verticalSpaceLarge(),

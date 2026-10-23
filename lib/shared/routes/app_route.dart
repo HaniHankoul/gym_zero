@@ -3,11 +3,26 @@ import 'package:go_router/go_router.dart';
 import '../../screens/home/home_screen.dart';
 import '../../screens/login/login_screen.dart';
 
-class AppRoute {
-  final router = GoRouter(
-    routes: [
-      GoRoute(path: '/home', builder: (context, state) => const HomeScreen()),
-      GoRoute(path: '/', builder: (context, state) => const LoginScreen()),
-    ],
-  );
-}
+final router = GoRouter(
+  routes: [
+    GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
+    // GoRoute(
+    //   path: '/members',
+    //   builder: (context, state) => const MembersScreen(),
+    // ),
+    // GoRoute(
+    //   path: '/subscriptions',
+    //   builder: (context, state) => const SubscriptionsScreen(),
+    // ),
+    // GoRoute(
+    //   path: '/payments',
+    //   builder: (context, state) => const PaymentsScreen(),
+    // ),
+    // GoRoute(path: '/staff', builder: (context, state) => const StaffScreen()),
+    // GoRoute(
+    //   path: '/reports',
+    //   builder: (context, state) => const ReportsScreen(),
+    // ),
+    GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+  ],
+);

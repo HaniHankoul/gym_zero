@@ -64,8 +64,10 @@ class NavigationPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = MediaQuery.sizeOf(context).width < 800;
+
     return Container(
-      width: 250,
+      width: isCompact ? 72 : 250,
       padding: EdgeInsets.all(GeneralSizes.largeSize),
       decoration: BoxDecoration(
         color: AppThemeDark.secondary,
@@ -78,6 +80,7 @@ class NavigationPanel extends StatelessWidget {
               title: item.title,
               icon: item.icon,
               section: item.section,
+              isCompact: isCompact,
             ),
             verticalSpaceLarge(),
           ],

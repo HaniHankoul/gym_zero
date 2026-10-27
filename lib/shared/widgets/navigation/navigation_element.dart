@@ -10,11 +10,13 @@ class NavigationElements extends ConsumerWidget {
   final String title;
   final List<List<dynamic>> icon;
   final NavigationSection section;
+  final bool isCompact;
 
   const NavigationElements({
     required this.title,
     required this.icon,
     required this.section,
+    this.isCompact = false,
     super.key,
   });
 
@@ -25,6 +27,8 @@ class NavigationElements extends ConsumerWidget {
 
     return MaterialButton(
       height: 50,
+      minWidth: isCompact ? 0 : null,
+      padding: isCompact ? EdgeInsets.zero : null,
       onPressed: () {
         ref.read(navigationProvider.notifier).select(section);
       },
@@ -39,15 +43,20 @@ class NavigationElements extends ConsumerWidget {
         borderRadius: BorderRadius.circular(GeneralSizes.borderRadiusS),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: GeneralSizes.smallSize,
+        padding: EdgeInsets.symmetric(
+          horizontal: isCompact ? 0 : GeneralSizes.smallSize,
           vertical: 4,
         ),
         child: Row(
+          mainAxisAlignment: isCompact
+              ? MainAxisAlignment.center
+              : MainAxisAlignment.start,
           children: [
             HugeIcon(icon: icon, size: 18),
-            const SizedBox(width: 8),
-            Text(title, style: const TextStyle(color: Colors.black)),
+            if (!isCompact) ...[
+              const SizedBox(width: 8),
+              Text(title, style: const TextStyle(color: Colors.black)),
+            ],
           ],
         ),
       ),

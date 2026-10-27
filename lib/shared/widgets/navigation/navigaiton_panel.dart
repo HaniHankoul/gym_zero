@@ -64,7 +64,7 @@ class NavigationPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isCompact = MediaQuery.sizeOf(context).width < 800;
+    final isCompact = MediaQuery.sizeOf(context).width < 900;
 
     return Container(
       width: isCompact ? 72 : 250,

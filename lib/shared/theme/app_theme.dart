@@ -73,7 +73,7 @@ class AppThemeDark {
   static Color get accent => _secondary;
   static Color get highlighted => _secondary;
   // Text colors
-  static const Color textPrimary = Color(0xFF020215);
+  static const Color textPrimary = white;
   static const Color textPrimaryDark = Color(0xff795C2C);
   static const Color textSecondary = Color(0xFF04AED4);
   static const Color textWhite = Colors.white;

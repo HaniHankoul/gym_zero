@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gym_zero/screens/home/home_body.dart';
+import 'package:gym_zero/screens/payments/payments_screen.dart';
 import 'package:gym_zero/shared/widgets/navigation/navigaiton_panel.dart';
 
 import '../providers/navigation_provider.dart';
@@ -47,6 +48,7 @@ class _NavigationBody extends StatelessWidget {
         return const MembersScreen();
       case NavigationSection.subscriptions:
       case NavigationSection.payments:
+        return PaymentsScreen();
       case NavigationSection.staff:
       case NavigationSection.reports:
         return Center(

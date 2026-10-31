@@ -31,7 +31,7 @@ class CustomTextField extends StatelessWidget {
       controller: controller,
       onTap: onTap,
       readOnly: readOnly,
-      onFieldSubmitted: onFieldSubmitted,
+      onChanged: onFieldSubmitted,
       decoration: InputDecoration(
         hintText: hintText,
         hintStyle: TextStyle(color: AppThemeDark.primary, fontFamily: "cairo"),

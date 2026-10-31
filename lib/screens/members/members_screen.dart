@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 
+import '../../models/members_dummy.dart';
 import '../../shared/constants/general_sizes.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/custom_text.dart';
@@ -19,51 +20,6 @@ class MemberRecord {
     required this.expiryDate,
   });
 }
-
-const _members = [
-  MemberRecord(
-    name: 'John Smith',
-    membership: 'Gold',
-    status: 'Active',
-    expiryDate: '2024-12-31',
-  ),
-  MemberRecord(
-    name: 'Edmar Johnson',
-    membership: 'Silver',
-    status: 'Active',
-    expiryDate: '2024-12-31',
-  ),
-  MemberRecord(
-    name: 'Maria Pime',
-    membership: 'Silver',
-    status: 'Active',
-    expiryDate: '2024-12-31',
-  ),
-  MemberRecord(
-    name: 'Maria Garcia',
-    membership: 'Silver',
-    status: 'Expired',
-    expiryDate: '2023-11-15',
-  ),
-  MemberRecord(
-    name: 'Ranny Smith',
-    membership: 'Gold',
-    status: 'Active',
-    expiryDate: '2024-12-31',
-  ),
-  MemberRecord(
-    name: 'Alhan Game',
-    membership: 'Silver',
-    status: 'Active',
-    expiryDate: '2024-11-15',
-  ),
-  MemberRecord(
-    name: 'Denna Smith',
-    membership: 'Silver',
-    status: 'Active',
-    expiryDate: '2024-12-31',
-  ),
-];
 
 class MembersScreen extends StatefulWidget {
   const MembersScreen({super.key});
@@ -84,7 +40,7 @@ class _MembersScreenState extends State<MembersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredMembers = _members
+    final filteredMembers = MembersDummy.getMembers()
         .where((member) => member.name.toLowerCase().contains(_searchQuery))
         .toList();
 
@@ -281,10 +237,10 @@ class _MembersTable extends StatelessWidget {
                           : null,
                     ),
                     cells: [
-                      DataCell(Text(member.name)),
-                      DataCell(Text(member.membership)),
+                      DataCell(CustomText(text: member.name)),
+                      DataCell(CustomText(text: member.membership)),
                       DataCell(_StatusLabel(status: member.status)),
-                      DataCell(Text(member.expiryDate)),
+                      DataCell(CustomText(text: member.expiryDate)),
                       DataCell(
                         Row(
                           mainAxisSize: MainAxisSize.min,

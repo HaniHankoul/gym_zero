@@ -7,6 +7,7 @@ import 'package:gym_zero/shared/widgets/navigation/navigaiton_panel.dart';
 import '../providers/navigation_provider.dart';
 import '../shared/theme/app_theme.dart';
 import 'members/members_screen.dart';
+import 'reports/reports_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -51,12 +52,7 @@ class _NavigationBody extends StatelessWidget {
         return PaymentsScreen();
       case NavigationSection.staff:
       case NavigationSection.reports:
-        return Center(
-          child: Text(
-            'Coming Soon',
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-        );
+        return ReportsScreen();
     }
   }
 }

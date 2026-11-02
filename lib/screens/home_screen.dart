@@ -17,18 +17,26 @@ class HomeScreen extends ConsumerWidget {
     final section = ref.watch(navigationProvider);
 
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: AppThemeDark.primaryBackground,
+
+        title: Text(
+          'GymZero',
+          style: TextStyle(
+            color: AppThemeDark.primary,
+            fontWeight: FontWeight.w700,
+            fontSize: 25,
+          ),
+        ),
+      ),
       backgroundColor: AppThemeDark.primaryBackground,
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const NavigationPanel(),
-                Expanded(child: _NavigationBody(section: section)),
-              ],
-            );
-          },
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const NavigationPanel(),
+            Expanded(child: _NavigationBody(section: section)),
+          ],
         ),
       ),
     );

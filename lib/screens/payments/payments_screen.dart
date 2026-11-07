@@ -144,8 +144,15 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                 ),
                 FilledButton.icon(
                   onPressed: () => _showReportDialog(context),
-                  icon: const Icon(Icons.assessment_outlined, size: 18),
-                  label: const Text('Create report'),
+                  icon: const Icon(
+                    Icons.assessment_outlined,
+                    size: 18,
+                    color: Colors.black,
+                  ),
+                  label: const Text(
+                    'Create report',
+                    style: TextStyle(color: Colors.black),
+                  ),
                   style: FilledButton.styleFrom(
                     backgroundColor: AppThemeDark.primary,
                     foregroundColor: AppThemeDark.textPrimary,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:gym_zero/shared/theme/app_theme.dart';
 import 'package:gym_zero/shared/widgets/custom_text.dart';
 import 'package:gym_zero/shared/widgets/universal_button.dart';
@@ -10,10 +11,12 @@ class LoginContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = MediaQuery.sizeOf(context).width < 900;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: GeneralSizes.largeSize),
       child: Container(
-        width: 250,
+        width: isCompact ? 72 : 250,
         decoration: BoxDecoration(
           color: AppThemeDark.secondary,
           borderRadius: BorderRadius.circular(GeneralSizes.borderRadiusM),
@@ -33,29 +36,33 @@ class LoginContent extends StatelessWidget {
                 child: Row(
                   children: [
                     CircleAvatar(
-                      radius: 20,
+                      radius: 18,
                       backgroundColor: AppThemeDark.primary,
                       child: Icon(Icons.person, color: Colors.black, size: 24),
                     ),
                     horizontalSpaceSmall(),
-                    CustomText(
-                      text: 'Username',
-                      fontSize: 16,
-                      color: Colors.white,
-                    ),
+                    if (!isCompact)
+                      CustomText(
+                        text: 'Username',
+                        fontSize: 16,
+                        color: Colors.white,
+                      ),
                   ],
                 ),
               ),
               verticalSpaceSmall(),
               verticalSpaceSmall(),
-              UniversalButton(
-                onTap: () {},
-                title: 'Log Out',
-                color: AppThemeDark.primary,
-                textColor: Colors.black,
-                borderColor: AppThemeDark.primary,
-                icon: Icons.logout,
-              ),
+              if (!isCompact)
+                UniversalButton(
+                  onTap: () {
+                    context.go('/login');
+                  },
+                  title: 'Log Out',
+                  color: AppThemeDark.primary,
+                  textColor: Colors.black,
+                  borderColor: AppThemeDark.primary,
+                  icon: Icons.logout,
+                ),
               verticalSpaceSmall(),
             ],
           ),

@@ -163,8 +163,15 @@ class _PageHeader extends StatelessWidget {
         ),
         FilledButton.icon(
           onPressed: onGenerate,
-          icon: const Icon(Icons.assessment_outlined, size: 18),
-          label: const Text('Generate report'),
+          icon: const Icon(
+            Icons.assessment_outlined,
+            size: 18,
+            color: Colors.black,
+          ),
+          label: const Text(
+            'Generate report',
+            style: TextStyle(color: Colors.black),
+          ),
           style: FilledButton.styleFrom(
             backgroundColor: AppThemeDark.primary,
             foregroundColor: AppThemeDark.textPrimary,

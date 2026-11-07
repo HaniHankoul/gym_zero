@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:gym_zero/shared/constants/general_sizes.dart';
 import 'package:gym_zero/shared/theme/app_theme.dart';
 import 'package:gym_zero/shared/widgets/custom_text_field.dart';
 import 'package:hugeicons/hugeicons.dart';
 
+import '../../../providers/navigation_provider.dart';
 import '../../../shared/widgets/custom_text.dart';
 import '../../../shared/widgets/universal_button.dart';
 
-class LoginFormBody extends StatelessWidget {
+class LoginFormBody extends ConsumerWidget {
   const LoginFormBody({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -78,7 +81,12 @@ class LoginFormBody extends StatelessWidget {
             verticalSpaceLarge(),
             verticalSpaceLarge(),
             UniversalButton(
-              onTap: () {},
+              onTap: () {
+                context.go('/');
+                ref
+                    .read(navigationProvider.notifier)
+                    .select(NavigationSection.home);
+              },
               title: 'Sign in',
               icon: Icons.arrow_forward,
               color: AppThemeDark.primary,

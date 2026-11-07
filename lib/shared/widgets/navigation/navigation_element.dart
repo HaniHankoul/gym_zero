@@ -33,11 +33,11 @@ class NavigationElements extends ConsumerWidget {
         ref.read(navigationProvider.notifier).select(section);
       },
       hoverElevation: 2,
-      splashColor: Colors.grey,
+      splashColor: AppThemeDark.primary.withAlpha(100),
       highlightColor: AppThemeDark.primaryLight,
-      color: isSelected ? AppThemeDark.primaryLight : AppThemeDark.primary,
+      color: isSelected ? AppThemeDark.primary : AppThemeDark.secondary,
       elevation: 2,
-      hoverColor: AppThemeDark.primaryLight,
+      hoverColor: AppThemeDark.primary.withAlpha(100),
       mouseCursor: SystemMouseCursors.click,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(GeneralSizes.borderRadiusS),
@@ -52,10 +52,19 @@ class NavigationElements extends ConsumerWidget {
               ? MainAxisAlignment.center
               : MainAxisAlignment.start,
           children: [
-            HugeIcon(icon: icon, size: 18),
+            HugeIcon(
+              icon: icon,
+              size: 18,
+              color: isSelected ? Colors.black : Colors.white,
+            ),
             if (!isCompact) ...[
               const SizedBox(width: 8),
-              Text(title, style: const TextStyle(color: Colors.black)),
+              Text(
+                title,
+                style: TextStyle(
+                  color: isSelected ? Colors.black : Colors.white,
+                ),
+              ),
             ],
           ],
         ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../shared/constants/general_sizes.dart';
 import '../../shared/theme/app_theme.dart';
+import '../../shared/widgets/custom_text.dart';
 
 enum _ReportType { membership, payments, revenue }
 
@@ -452,15 +453,26 @@ class _GenerateReportDialogState extends State<_GenerateReportDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Generate report'),
+      backgroundColor: AppThemeDark.primaryBackground,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: AppThemeDark.borderPrimary),
+      ),
+      title: CustomText(
+        text: 'Generate report',
+        fontSize: 22,
+        fontWeight: FontWeight.w700,
+      ),
       content: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'Report period',
-              style: TextStyle(fontWeight: FontWeight.w700),
+            CustomText(
+              text: 'Report period',
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
             ),
             const SizedBox(height: 10),
             Row(
@@ -483,13 +495,29 @@ class _GenerateReportDialogState extends State<_GenerateReportDialog> {
               ],
             ),
             const SizedBox(height: 20),
-            const Text(
-              'Report type',
-              style: TextStyle(fontWeight: FontWeight.w700),
+            CustomText(
+              text: 'Report type',
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<_ReportType>(
               initialValue: _type,
+              dropdownColor: AppThemeDark.secondary,
+              style: const TextStyle(color: AppThemeDark.textWhite),
+              iconEnabledColor: AppThemeDark.primary,
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: AppThemeDark.secondary,
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: AppThemeDark.borderPrimary),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: AppThemeDark.primary, width: 2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
               items: const [
                 DropdownMenuItem(
                   value: _ReportType.revenue,
@@ -518,6 +546,15 @@ class _GenerateReportDialogState extends State<_GenerateReportDialog> {
                 ButtonSegment(value: 'CSV', label: Text('CSV')),
               ],
               selected: {_format},
+              style: ButtonStyle(
+                foregroundColor: WidgetStatePropertyAll(AppThemeDark.textWhite),
+                overlayColor: WidgetStatePropertyAll(
+                  AppThemeDark.primary.withValues(alpha: 0.12),
+                ),
+                side: WidgetStatePropertyAll(
+                  BorderSide(color: AppThemeDark.borderPrimary),
+                ),
+              ),
               onSelectionChanged: (selection) =>
                   setState(() => _format = selection.first),
             ),
@@ -527,10 +564,15 @@ class _GenerateReportDialogState extends State<_GenerateReportDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
+          style: TextButton.styleFrom(foregroundColor: AppThemeDark.primary),
           child: const Text('Cancel'),
         ),
         FilledButton(
           onPressed: _generate,
+          style: FilledButton.styleFrom(
+            backgroundColor: AppThemeDark.primary,
+            foregroundColor: AppThemeDark.textPrimary,
+          ),
           child: const Text('Generate report'),
         ),
       ],
@@ -567,6 +609,11 @@ class _DateButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return OutlinedButton(
       onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppThemeDark.textWhite,
+        side: BorderSide(color: AppThemeDark.borderPrimary),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

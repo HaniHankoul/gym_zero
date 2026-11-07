@@ -85,6 +85,7 @@ class _UniversalButtonState extends State<UniversalButton> {
             border: Border.all(color: widget.borderColor, width: 2),
           ),
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             textDirection: TextDirection.rtl,
             children: [

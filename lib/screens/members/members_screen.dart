@@ -6,18 +6,23 @@ import '../../shared/constants/general_sizes.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/custom_text.dart';
 import '../../shared/widgets/custom_text_field.dart';
+import 'widgets/add_member_dialog.dart';
 
 class MemberRecord {
   final String name;
+  final int? age;
   final String membership;
   final String status;
   final String expiryDate;
+  final double? price;
 
   const MemberRecord({
     required this.name,
+    this.age,
     required this.membership,
     required this.status,
     required this.expiryDate,
+    this.price,
   });
 }
 
@@ -30,7 +35,18 @@ class MembersScreen extends StatefulWidget {
 
 class _MembersScreenState extends State<MembersScreen> {
   final _searchController = TextEditingController();
+  final List<MemberRecord> _members = MembersDummy.getMembers();
   String _searchQuery = '';
+
+  Future<void> _showAddMemberDialog() async {
+    final member = await showDialog<MemberRecord>(
+      context: context,
+      builder: (context) => const AddMemberDialog(),
+    );
+    if (!mounted || member == null) return;
+
+    setState(() => _members.add(member));
+  }
 
   @override
   void dispose() {
@@ -40,7 +56,7 @@ class _MembersScreenState extends State<MembersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredMembers = MembersDummy.getMembers()
+    final filteredMembers = _members
         .where((member) => member.name.toLowerCase().contains(_searchQuery))
         .toList();
 
@@ -53,7 +69,10 @@ class _MembersScreenState extends State<MembersScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _MembersHeader(memberCount: filteredMembers.length),
+                _MembersHeader(
+                  memberCount: filteredMembers.length,
+                  onAddMember: _showAddMemberDialog,
+                ),
                 const SizedBox(height: 24),
                 _MembersToolbar(
                   controller: _searchController,
@@ -77,8 +96,9 @@ class _MembersScreenState extends State<MembersScreen> {
 
 class _MembersHeader extends StatelessWidget {
   final int memberCount;
+  final VoidCallback onAddMember;
 
-  const _MembersHeader({required this.memberCount});
+  const _MembersHeader({required this.memberCount, required this.onAddMember});
 
   @override
   Widget build(BuildContext context) {
@@ -105,9 +125,16 @@ class _MembersHeader extends StatelessWidget {
           ),
         ),
         FilledButton.icon(
-          onPressed: () {},
-          icon: const Icon(Icons.person_add_alt_1, size: 18),
-          label: const Text('Add member'),
+          onPressed: onAddMember,
+          icon: const Icon(
+            Icons.person_add_alt_1,
+            size: 18,
+            color: Colors.black,
+          ),
+          label: const Text(
+            'Add member',
+            style: TextStyle(color: Colors.black),
+          ),
           style: FilledButton.styleFrom(
             backgroundColor: AppThemeDark.primary,
             foregroundColor: AppThemeDark.textPrimary,
@@ -223,7 +250,9 @@ class _MembersTable extends StatelessWidget {
               headingRowColor: WidgetStatePropertyAll(AppThemeDark.secondary),
               columns: [
                 DataColumn(label: CustomText(text: 'Name')),
+                DataColumn(label: CustomText(text: 'Age')),
                 DataColumn(label: CustomText(text: 'Membership Type')),
+                DataColumn(label: CustomText(text: 'Price')),
                 DataColumn(label: CustomText(text: 'Status')),
                 DataColumn(label: CustomText(text: 'Expiry Date')),
                 DataColumn(label: CustomText(text: 'Actions')),
@@ -238,7 +267,15 @@ class _MembersTable extends StatelessWidget {
                     ),
                     cells: [
                       DataCell(CustomText(text: member.name)),
+                      DataCell(CustomText(text: member.age?.toString() ?? '-')),
                       DataCell(CustomText(text: member.membership)),
+                      DataCell(
+                        CustomText(
+                          text: member.price == null
+                              ? '-'
+                              : member.price!.toStringAsFixed(2),
+                        ),
+                      ),
                       DataCell(_StatusLabel(status: member.status)),
                       DataCell(CustomText(text: member.expiryDate)),
                       DataCell(

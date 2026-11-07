@@ -12,8 +12,11 @@ class CustomTextField extends StatelessWidget {
     this.controller,
     this.suffixIcon,
     required this.hintText,
-    required this.icon,
+    this.icon,
     this.prefixCallBack,
+    this.validator,
+    this.keyboardType,
+    this.autofocus = false,
   });
   final Function(String)? onFieldSubmitted;
   final VoidCallback? onTap;
@@ -21,8 +24,11 @@ class CustomTextField extends StatelessWidget {
   final TextEditingController? controller;
   final Widget? suffixIcon;
   final String hintText;
-  final List<List<dynamic>> icon;
+  final List<List<dynamic>>? icon;
   final VoidCallback? prefixCallBack;
+  final String? Function(String?)? validator;
+  final TextInputType? keyboardType;
+  final bool autofocus;
   @override
   Widget build(BuildContext context) {
     return TextFormField(
@@ -32,6 +38,9 @@ class CustomTextField extends StatelessWidget {
       onTap: onTap,
       readOnly: readOnly,
       onChanged: onFieldSubmitted,
+      validator: validator,
+      keyboardType: keyboardType,
+      autofocus: autofocus,
       decoration: InputDecoration(
         hintText: hintText,
         hintStyle: TextStyle(color: AppThemeDark.primary, fontFamily: "cairo"),
@@ -39,15 +48,17 @@ class CustomTextField extends StatelessWidget {
         //   onPressed: prefixCallBack,
         //   icon: Icon(Icons.search, color: AppThemeDark.primary, size: 26),
         // ),
-        suffixIcon: SizedBox(
-          height: 1,
-          child: HugeIcon(
-            icon: icon,
-            size: 15,
-            color: AppThemeDark.primary,
-            strokeWidth: 1,
-          ),
-        ),
+        suffixIcon: icon == null
+            ? suffixIcon
+            : SizedBox(
+                height: 1,
+                child: HugeIcon(
+                  icon: icon!,
+                  size: 15,
+                  color: AppThemeDark.primary,
+                  strokeWidth: 1,
+                ),
+              ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: AppThemeDark.primary),

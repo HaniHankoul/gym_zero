@@ -36,7 +36,7 @@ class NavigationElements extends ConsumerWidget {
       splashColor: AppThemeDark.primary.withAlpha(100),
       highlightColor: AppThemeDark.primaryLight,
       color: isSelected ? AppThemeDark.primary : AppThemeDark.secondary,
-      elevation: 2,
+      elevation: isSelected ? 3 : 0,
       hoverColor: AppThemeDark.primary.withAlpha(100),
       mouseCursor: SystemMouseCursors.click,
       shape: RoundedRectangleBorder(

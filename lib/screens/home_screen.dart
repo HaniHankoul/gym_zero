@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gym_zero/screens/home/home_body.dart';
 import 'package:gym_zero/screens/payments/payments_screen.dart';
+import 'package:gym_zero/screens/home/widgets/login_content.dart';
+import 'package:gym_zero/shared/constants/general_sizes.dart';
 import 'package:gym_zero/shared/widgets/navigation/navigaiton_panel.dart';
 
 import '../providers/navigation_provider.dart';
@@ -34,7 +36,14 @@ class HomeScreen extends ConsumerWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const NavigationPanel(),
+            Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const NavigationPanel(),
+                verticalSpaceLarge(),
+                LoginContent(),
+              ],
+            ),
             Expanded(child: _NavigationBody(section: section)),
           ],
         ),

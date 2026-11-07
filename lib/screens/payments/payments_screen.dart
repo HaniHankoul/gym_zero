@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../shared/constants/general_sizes.dart';
 import '../../shared/theme/app_theme.dart';
+import '../../shared/widgets/custom_text.dart';
 
 enum _ReportSource { memberPayments, gymExpenses }
 
@@ -499,15 +500,26 @@ class _ReportDialogState extends State<_ReportDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Create payment report'),
+      backgroundColor: AppThemeDark.primaryBackground,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: AppThemeDark.borderPrimary),
+      ),
+      title: CustomText(
+        text: 'Create payment report',
+        fontSize: 22,
+        fontWeight: FontWeight.w700,
+      ),
       content: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'Report period',
-              style: TextStyle(fontWeight: FontWeight.w700),
+            CustomText(
+              text: 'Report period',
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
             ),
             const SizedBox(height: 10),
             Row(
@@ -530,9 +542,10 @@ class _ReportDialogState extends State<_ReportDialog> {
               ],
             ),
             const SizedBox(height: 20),
-            const Text(
-              'Include in report',
-              style: TextStyle(fontWeight: FontWeight.w700),
+            CustomText(
+              text: 'Include in report',
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
             ),
             const SizedBox(height: 10),
             SegmentedButton<_ReportSource>(
@@ -549,13 +562,27 @@ class _ReportDialogState extends State<_ReportDialog> {
                 ),
               ],
               selected: {_source},
+              style: ButtonStyle(
+                foregroundColor: WidgetStatePropertyAll(AppThemeDark.textWhite),
+                overlayColor: WidgetStatePropertyAll(
+                  AppThemeDark.primary.withValues(alpha: 0.12),
+                ),
+                side: WidgetStatePropertyAll(
+                  BorderSide(color: AppThemeDark.borderPrimary),
+                ),
+              ),
               onSelectionChanged: (selection) {
                 setState(() => _source = selection.first);
               },
             ),
             CheckboxListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Show member subscription history'),
+              activeColor: AppThemeDark.primary,
+              checkColor: AppThemeDark.textPrimary,
+              title: const Text(
+                'Show member subscription history',
+                style: TextStyle(color: AppThemeDark.textWhite),
+              ),
               value: _includeHistory,
               onChanged: (value) =>
                   setState(() => _includeHistory = value ?? false),
@@ -566,6 +593,7 @@ class _ReportDialogState extends State<_ReportDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
+          style: TextButton.styleFrom(foregroundColor: AppThemeDark.primary),
           child: const Text('Cancel'),
         ),
         FilledButton(
@@ -577,6 +605,10 @@ class _ReportDialogState extends State<_ReportDialog> {
               source: _source,
               includeHistory: _includeHistory,
             ),
+          ),
+          style: FilledButton.styleFrom(
+            backgroundColor: AppThemeDark.primary,
+            foregroundColor: AppThemeDark.textPrimary,
           ),
           child: const Text('Generate report'),
         ),
@@ -601,6 +633,8 @@ class _DateButton extends StatelessWidget {
     return OutlinedButton(
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
+        foregroundColor: AppThemeDark.textWhite,
+        side: BorderSide(color: AppThemeDark.borderPrimary),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       ),
       child: Column(

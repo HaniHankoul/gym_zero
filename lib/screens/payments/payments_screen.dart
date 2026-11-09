@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/payment_provider.dart';
+import '../../providers/reports_provider.dart';
 import '../../shared/constants/general_sizes.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/custom_text.dart';
@@ -34,7 +35,9 @@ class PaymentsScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _PaymentsHeader(onReportTap: () => _showReportDialog(context)),
+                _PaymentsHeader(
+                  onReportTap: () => _showReportDialog(context, ref),
+                ),
                 const SizedBox(height: 24),
                 _SummaryRow(
                   memberTotal: data.memberTotal,
@@ -72,24 +75,34 @@ class PaymentsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _showReportDialog(BuildContext context) async {
+  Future<void> _showReportDialog(BuildContext context, WidgetRef ref) async {
     final result = await showDialog<_ReportSettings>(
       context: context,
       builder: (context) => const _ReportDialog(),
     );
     if (!context.mounted || result == null) return;
 
-    final source = result.source == _ReportSource.memberPayments
-        ? 'member payments'
-        : 'gym expenses';
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Report ready: $source, ${_formatDate(result.start)} - '
-          '${_formatDate(result.end)}${result.includeHistory ? ', with subscription history' : ''}.',
+    final period = '${_formatDate(result.start)} - ${_formatDate(result.end)}';
+    final isPayments = result.source == _ReportSource.memberPayments;
+    final reportName =
+        '${isPayments ? "Payments report" : "Gym expenses report"} - ${_formatDate(result.start)}';
+
+    await ref
+        .read(reportsProvider.notifier)
+        .addReport(
+          name: reportName,
+          type: ReportType.payments,
+          period: period,
+          format: 'PDF',
+        );
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$reportName created and saved to Reports history.'),
         ),
-      ),
-    );
+      );
+    }
   }
 }
 

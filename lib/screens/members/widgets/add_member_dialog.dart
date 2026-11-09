@@ -3,7 +3,20 @@ import 'package:gym_zero/shared/widgets/custom_text.dart';
 
 import '../../../shared/theme/app_theme.dart';
 import '../../../shared/widgets/custom_text_field.dart';
-import '../members_screen.dart';
+
+class NewMemberPayload {
+  final String name;
+  final int age;
+  final int? durationMonths;
+  final double? price;
+
+  const NewMemberPayload({
+    required this.name,
+    required this.age,
+    this.durationMonths,
+    this.price,
+  });
+}
 
 class AddMemberDialog extends StatefulWidget {
   const AddMemberDialog({super.key});
@@ -33,17 +46,12 @@ class _AddMemberDialogState extends State<AddMemberDialog> {
 
     final duration = int.tryParse(_durationController.text.trim());
     final price = double.tryParse(_priceController.text.trim());
-    final expiryDate = duration == null
-        ? '-'
-        : _formatExpiryDate(DateTime.now(), duration);
 
     Navigator.of(context).pop(
-      MemberRecord(
+      NewMemberPayload(
         name: _nameController.text.trim(),
         age: int.parse(_ageController.text.trim()),
-        membership: duration == null ? 'No membership' : '$duration months',
-        status: duration == null ? 'Inactive' : 'Active',
-        expiryDate: expiryDate,
+        durationMonths: duration,
         price: price,
       ),
     );
@@ -165,10 +173,4 @@ class _AddMemberDialogState extends State<AddMemberDialog> {
       ],
     );
   }
-}
-
-String _formatExpiryDate(DateTime start, int durationMonths) {
-  final expiry = DateTime(start.year, start.month + durationMonths, start.day);
-  return '${expiry.year}-${expiry.month.toString().padLeft(2, '0')}-'
-      '${expiry.day.toString().padLeft(2, '0')}';
 }

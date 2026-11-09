@@ -1,51 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hugeicons/hugeicons.dart';
 
-import '../../models/members_dummy.dart';
+import '../../providers/members_provider.dart';
 import '../../shared/constants/general_sizes.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/custom_text.dart';
 import '../../shared/widgets/custom_text_field.dart';
 import 'widgets/add_member_dialog.dart';
 
-class MemberRecord {
-  final String name;
-  final int? age;
-  final String membership;
-  final String status;
-  final String expiryDate;
-  final double? price;
-
-  const MemberRecord({
-    required this.name,
-    this.age,
-    required this.membership,
-    required this.status,
-    required this.expiryDate,
-    this.price,
-  });
-}
-
-class MembersScreen extends StatefulWidget {
+class MembersScreen extends ConsumerStatefulWidget {
   const MembersScreen({super.key});
 
   @override
-  State<MembersScreen> createState() => _MembersScreenState();
+  ConsumerState<MembersScreen> createState() => _MembersScreenState();
 }
 
-class _MembersScreenState extends State<MembersScreen> {
-  final _searchController = TextEditingController();
-  final List<MemberRecord> _members = MembersDummy.getMembers();
-  String _searchQuery = '';
+class _MembersScreenState extends ConsumerState<MembersScreen> {
+  late final TextEditingController _searchController;
 
-  Future<void> _showAddMemberDialog() async {
-    final member = await showDialog<MemberRecord>(
-      context: context,
-      builder: (context) => const AddMemberDialog(),
-    );
-    if (!mounted || member == null) return;
-
-    setState(() => _members.add(member));
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
   }
 
   @override
@@ -54,11 +31,26 @@ class _MembersScreenState extends State<MembersScreen> {
     super.dispose();
   }
 
+  Future<void> _showAddMemberDialog() async {
+    final payload = await showDialog<NewMemberPayload>(
+      context: context,
+      builder: (context) => const AddMemberDialog(),
+    );
+    if (!mounted || payload == null) return;
+
+    await ref
+        .read(membersProvider.notifier)
+        .addMemberWithSubscription(
+          name: payload.name,
+          age: payload.age,
+          durationMonths: payload.durationMonths,
+          price: payload.price,
+        );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final filteredMembers = _members
-        .where((member) => member.name.toLowerCase().contains(_searchQuery))
-        .toList();
+    final filteredMembersAsync = ref.watch(filteredMembersProvider);
 
     return Container(
       color: AppThemeDark.primaryBackground,
@@ -70,20 +62,40 @@ class _MembersScreenState extends State<MembersScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _MembersHeader(
-                  memberCount: filteredMembers.length,
+                  memberCount: filteredMembersAsync.value?.length ?? 0,
                   onAddMember: _showAddMemberDialog,
                 ),
                 const SizedBox(height: 24),
                 _MembersToolbar(
                   controller: _searchController,
                   onSearchChanged: (value) {
-                    setState(() => _searchQuery = value.trim().toLowerCase());
+                    ref.read(memberSearchQueryProvider.notifier).state = value
+                        .trim();
                   },
                 ),
                 const SizedBox(height: 16),
-                _MembersTable(
-                  members: filteredMembers,
-                  availableWidth: constraints.maxWidth,
+                filteredMembersAsync.when(
+                  loading: () => const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(32.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  ),
+                  error: (err, stack) => Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32.0),
+                      child: CustomText(
+                        text: 'Failed to load members: $err',
+                        color: AppThemeDark.error,
+                      ),
+                    ),
+                  ),
+                  data: (members) => _MembersTable(
+                    members: members,
+                    availableWidth: constraints.maxWidth,
+                    onDelete: (id) =>
+                        ref.read(membersProvider.notifier).deleteMember(id),
+                  ),
                 ),
               ],
             ),
@@ -172,25 +184,6 @@ class _MembersToolbar extends StatelessWidget {
               onSearchChanged('');
             },
           ),
-          // child: TextField(
-          //   controller: controller,
-          //   onChanged: onSearchChanged,
-          //   style: const TextStyle(color: AppThemeDark.textWhite),
-          //   decoration: InputDecoration(
-          //     hintText: 'Search members',
-          //     prefixIcon: const Icon(Icons.search),
-          //     suffixIcon: controller.text.isNotEmpty
-          //         ? IconButton(
-          //             onPressed: () {
-          //               controller.clear();
-          //               onSearchChanged('');
-          //             },
-          //             icon: const Icon(Icons.close),
-          //             tooltip: 'Clear search',
-          //           )
-          //         : null,
-          //   ),
-          // ),
         ),
         _ToolbarButton(label: 'Add New Membership', onPressed: () {}),
         _ToolbarButton(label: 'Renew Membership', onPressed: () {}),
@@ -221,10 +214,15 @@ class _ToolbarButton extends StatelessWidget {
 }
 
 class _MembersTable extends StatelessWidget {
-  final List<MemberRecord> members;
+  final List<MemberDisplayModel> members;
   final double availableWidth;
+  final ValueChanged<int> onDelete;
 
-  const _MembersTable({required this.members, required this.availableWidth});
+  const _MembersTable({
+    required this.members,
+    required this.availableWidth,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -261,13 +259,13 @@ class _MembersTable extends StatelessWidget {
                 for (final member in members)
                   DataRow(
                     color: WidgetStateProperty.resolveWith(
-                      (states) => member.status == 'Expired'
+                      (states) => member.status.toLowerCase() == 'expired'
                           ? AppThemeDark.error.withValues(alpha: 0.16)
                           : null,
                     ),
                     cells: [
                       DataCell(CustomText(text: member.name)),
-                      DataCell(CustomText(text: member.age?.toString() ?? '-')),
+                      DataCell(CustomText(text: member.age.toString())),
                       DataCell(CustomText(text: member.membership)),
                       DataCell(
                         CustomText(
@@ -288,7 +286,7 @@ class _MembersTable extends StatelessWidget {
                               tooltip: 'Edit member',
                             ),
                             IconButton(
-                              onPressed: () {},
+                              onPressed: () => onDelete(member.id),
                               icon: const Icon(Icons.delete_outline, size: 19),
                               tooltip: 'Delete member',
                             ),
@@ -313,7 +311,7 @@ class _StatusLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isActive = status == 'Active';
+    final isActive = status.toLowerCase() == 'active';
     return Text(
       status,
       style: TextStyle(

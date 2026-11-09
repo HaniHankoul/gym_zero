@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hugeicons/hugeicons.dart';
 
-import '../../providers/members_provider.dart';
 import '../../shared/constants/general_sizes.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/custom_text.dart';
 import '../../shared/widgets/custom_text_field.dart';
+import '../../providers/members_provider.dart';
 import 'widgets/add_member_dialog.dart';
 
 class MembersScreen extends ConsumerStatefulWidget {

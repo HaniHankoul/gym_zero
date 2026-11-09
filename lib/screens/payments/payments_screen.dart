@@ -1,185 +1,73 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../providers/payment_provider.dart';
 import '../../shared/constants/general_sizes.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/custom_text.dart';
 
 enum _ReportSource { memberPayments, gymExpenses }
 
-class _MemberPayment {
-  final String member;
-  final String membership;
-  final DateTime date;
-  final double amount;
-  final String method;
-
-  const _MemberPayment({
-    required this.member,
-    required this.membership,
-    required this.date,
-    required this.amount,
-    required this.method,
-  });
-}
-
-class _GymExpense {
-  final String description;
-  final String category;
-  final DateTime date;
-  final double amount;
-  final String method;
-
-  const _GymExpense({
-    required this.description,
-    required this.category,
-    required this.date,
-    required this.amount,
-    required this.method,
-  });
-}
-
-class PaymentsScreen extends StatefulWidget {
+class PaymentsScreen extends ConsumerWidget {
   const PaymentsScreen({super.key});
 
   @override
-  State<PaymentsScreen> createState() => _PaymentsScreenState();
-}
-
-class _PaymentsScreenState extends State<PaymentsScreen> {
-  static final _memberPayments = [
-    _MemberPayment(
-      member: 'John Smith',
-      membership: 'Gold membership',
-      date: DateTime(2026, 9, 28),
-      amount: 80,
-      method: 'Card',
-    ),
-    _MemberPayment(
-      member: 'Maria Pime',
-      membership: 'Silver membership',
-      date: DateTime(2026, 9, 25),
-      amount: 55,
-      method: 'Cash',
-    ),
-    _MemberPayment(
-      member: 'Ranny Smith',
-      membership: 'Gold membership',
-      date: DateTime(2026, 9, 19),
-      amount: 80,
-      method: 'Bank transfer',
-    ),
-    _MemberPayment(
-      member: 'Edmar Johnson',
-      membership: 'Silver membership',
-      date: DateTime(2026, 9, 12),
-      amount: 55,
-      method: 'Card',
-    ),
-  ];
-
-  static final _gymExpenses = [
-    _GymExpense(
-      description: 'Monthly rent',
-      category: 'Facility',
-      date: DateTime(2026, 9, 3),
-      amount: 1200,
-      method: 'Bank transfer',
-    ),
-    _GymExpense(
-      description: 'Cleaning supplies',
-      category: 'Supplies',
-      date: DateTime(2026, 9, 10),
-      amount: 145,
-      method: 'Card',
-    ),
-    _GymExpense(
-      description: 'Equipment maintenance',
-      category: 'Maintenance',
-      date: DateTime(2026, 9, 21),
-      amount: 320,
-      method: 'Cash',
-    ),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final memberTotal = _memberPayments.fold<double>(
-      0,
-      (total, payment) => total + payment.amount,
-    );
-    final expenseTotal = _gymExpenses.fold<double>(
-      0,
-      (total, payment) => total + payment.amount,
-    );
+  Widget build(BuildContext context, WidgetRef ref) {
+    final paymentsAsync = ref.watch(paymentsProvider);
 
     return Container(
       color: AppThemeDark.primaryBackground,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(GeneralSizes.largeSize),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      child: paymentsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, stack) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: CustomText(
+              text: 'Failed to load payments: $err',
+              color: AppThemeDark.error,
+            ),
+          ),
+        ),
+        data: (data) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(GeneralSizes.largeSize),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Payments',
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(
-                              color: AppThemeDark.textWhite,
-                              fontWeight: FontWeight.w700,
-                            ),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'Track membership income and gym expenses for the last month.',
-                        style: TextStyle(color: AppThemeDark.textSecondary),
-                      ),
-                    ],
-                  ),
+                _PaymentsHeader(onReportTap: () => _showReportDialog(context)),
+                const SizedBox(height: 24),
+                _SummaryRow(
+                  memberTotal: data.memberTotal,
+                  memberCount: data.memberPayments.length,
+                  expenseTotal: data.expenseTotal,
+                  expenseCount: data.gymExpenses.length,
                 ),
-                FilledButton.icon(
-                  onPressed: () => _showReportDialog(context),
-                  icon: const Icon(
-                    Icons.assessment_outlined,
-                    size: 18,
-                    color: Colors.black,
-                  ),
-                  label: const Text(
-                    'Create report',
-                    style: TextStyle(color: Colors.black),
-                  ),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppThemeDark.primary,
-                    foregroundColor: AppThemeDark.textPrimary,
-                  ),
+                const SizedBox(height: 32),
+                _SectionTitle(
+                  title: 'Member Payments',
+                  subtitle:
+                      '${data.memberPayments.length} transactions recorded',
+                  icon: Icons.people_alt_outlined,
                 ),
+                const SizedBox(height: 14),
+                _MemberPaymentsViewer(
+                  payments: data.memberPayments,
+                  onDelete: (id) =>
+                      ref.read(paymentsProvider.notifier).deletePayment(id),
+                ),
+                const SizedBox(height: 32),
+                _SectionTitle(
+                  title: 'Gym Expenses',
+                  subtitle:
+                      '${data.gymExpenses.length} operational costs recorded',
+                  icon: Icons.account_balance_wallet_outlined,
+                ),
+                const SizedBox(height: 14),
+                _GymExpensesViewer(expenses: data.gymExpenses),
               ],
             ),
-            const SizedBox(height: 24),
-            _SummaryRow(memberTotal: memberTotal, expenseTotal: expenseTotal),
-            const SizedBox(height: 28),
-            _SectionTitle(
-              title: 'Member payments',
-              subtitle: 'Membership payments received in September 2026',
-              icon: Icons.people_alt_outlined,
-            ),
-            const SizedBox(height: 12),
-            _MemberPaymentsTable(payments: _memberPayments),
-            const SizedBox(height: 28),
-            _SectionTitle(
-              title: 'Gym payments',
-              subtitle: 'Operating expenses paid in September 2026',
-              icon: Icons.account_balance_wallet_outlined,
-            ),
-            const SizedBox(height: 12),
-            _GymExpensesTable(expenses: _gymExpenses),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -205,11 +93,68 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
   }
 }
 
+class _PaymentsHeader extends StatelessWidget {
+  final VoidCallback onReportTap;
+
+  const _PaymentsHeader({required this.onReportTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Payments',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: AppThemeDark.textWhite,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Real-time overview of revenue collection and gym operating expenses.',
+                style: TextStyle(color: AppThemeDark.textSecondary),
+              ),
+            ],
+          ),
+        ),
+        FilledButton.icon(
+          onPressed: onReportTap,
+          icon: const Icon(
+            Icons.assessment_outlined,
+            size: 18,
+            color: Colors.black,
+          ),
+          label: const Text(
+            'Create report',
+            style: TextStyle(color: Colors.black),
+          ),
+          style: FilledButton.styleFrom(
+            backgroundColor: AppThemeDark.primary,
+            foregroundColor: AppThemeDark.textPrimary,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _SummaryRow extends StatelessWidget {
   final double memberTotal;
+  final int memberCount;
   final double expenseTotal;
+  final int expenseCount;
 
-  const _SummaryRow({required this.memberTotal, required this.expenseTotal});
+  const _SummaryRow({
+    required this.memberTotal,
+    required this.memberCount,
+    required this.expenseTotal,
+    required this.expenseCount,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -224,17 +169,17 @@ class _SummaryRow extends StatelessWidget {
           children: [
             _SummaryCard(
               width: width,
-              label: 'Membership income',
+              label: 'Membership Income',
               value: _formatCurrency(memberTotal),
-              detail: '4 payments received',
+              detail: '$memberCount transactions recorded',
               icon: Icons.trending_up,
               color: AppThemeDark.success,
             ),
             _SummaryCard(
               width: width,
-              label: 'Gym expenses',
+              label: 'Gym Expenses',
               value: _formatCurrency(expenseTotal),
-              detail: '3 payments recorded',
+              detail: '$expenseCount expenses logged',
               icon: Icons.trending_down,
               color: AppThemeDark.warning,
             ),
@@ -276,11 +221,12 @@ class _SummaryCard extends StatelessWidget {
         child: Row(
           children: [
             CircleAvatar(
+              radius: 24,
               backgroundColor: color.withValues(alpha: 0.14),
               foregroundColor: color,
-              child: Icon(icon),
+              child: Icon(icon, size: 24),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 16),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -292,7 +238,7 @@ class _SummaryCard extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 6),
                 Text(
                   value,
                   style: const TextStyle(
@@ -301,6 +247,7 @@ class _SummaryCard extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
+                const SizedBox(height: 2),
                 Text(detail, style: TextStyle(color: color, fontSize: 12)),
               ],
             ),
@@ -326,7 +273,7 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, color: AppThemeDark.primary),
+        Icon(icon, color: AppThemeDark.primary, size: 22),
         const SizedBox(width: 10),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -335,7 +282,7 @@ class _SectionTitle extends StatelessWidget {
               title,
               style: const TextStyle(
                 color: AppThemeDark.textWhite,
-                fontSize: 18,
+                fontSize: 17,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -353,107 +300,253 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-class _MemberPaymentsTable extends StatelessWidget {
-  final List<_MemberPayment> payments;
+class _MemberPaymentsViewer extends StatelessWidget {
+  final List<MemberPaymentRecord> payments;
+  final ValueChanged<int> onDelete;
 
-  const _MemberPaymentsTable({required this.payments});
-
-  @override
-  Widget build(BuildContext context) {
-    return _TableShell(
-      child: DataTable(
-        columns: const [
-          DataColumn(label: Text('Member')),
-          DataColumn(label: Text('Membership')),
-          DataColumn(label: Text('Date')),
-          DataColumn(label: Text('Method')),
-          DataColumn(label: Text('Amount')),
-        ],
-        rows: [
-          for (final payment in payments)
-            DataRow(
-              cells: [
-                DataCell(Text(payment.member)),
-                DataCell(Text(payment.membership)),
-                DataCell(Text(_formatDate(payment.date))),
-                DataCell(_PaymentMethod(method: payment.method)),
-                DataCell(Text(_formatCurrency(payment.amount))),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _GymExpensesTable extends StatelessWidget {
-  final List<_GymExpense> expenses;
-
-  const _GymExpensesTable({required this.expenses});
+  const _MemberPaymentsViewer({required this.payments, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
-    return _TableShell(
-      child: DataTable(
-        columns: const [
-          DataColumn(label: Text('Description')),
-          DataColumn(label: Text('Category')),
-          DataColumn(label: Text('Date')),
-          DataColumn(label: Text('Method')),
-          DataColumn(label: Text('Amount')),
-        ],
-        rows: [
-          for (final expense in expenses)
-            DataRow(
-              cells: [
-                DataCell(Text(expense.description)),
-                DataCell(Text(expense.category)),
-                DataCell(Text(_formatDate(expense.date))),
-                DataCell(_PaymentMethod(method: expense.method)),
-                DataCell(Text(_formatCurrency(expense.amount))),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-}
+    if (payments.isEmpty) {
+      return const _EmptyStateCard(message: 'No member payments recorded yet.');
+    }
 
-class _TableShell extends StatelessWidget {
-  final Widget child;
-
-  const _TableShell({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
       decoration: BoxDecoration(
         color: AppThemeDark.secondary,
         borderRadius: BorderRadius.circular(GeneralSizes.borderRadiusM),
         border: Border.all(color: AppThemeDark.borderPrimary),
       ),
-      child: ClipRRect(
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: payments.length,
+        separatorBuilder: (_, __) => Divider(
+          color: AppThemeDark.borderPrimary.withValues(alpha: 0.5),
+          height: 1,
+        ),
+        itemBuilder: (context, index) {
+          final payment = payments[index];
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: AppThemeDark.primary.withValues(alpha: 0.12),
+                  child: Icon(
+                    Icons.person,
+                    color: AppThemeDark.primary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        payment.memberName,
+                        style: const TextStyle(
+                          color: AppThemeDark.textWhite,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        payment.membership,
+                        style: const TextStyle(
+                          color: AppThemeDark.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _MethodBadge(method: payment.method),
+                const SizedBox(width: 16),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '+${_formatCurrency(payment.amount)}',
+                      style: const TextStyle(
+                        color: AppThemeDark.success,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      _formatDate(payment.date),
+                      style: const TextStyle(
+                        color: AppThemeDark.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 10),
+                IconButton(
+                  onPressed: () => onDelete(payment.paymentId),
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  color: AppThemeDark.textSecondary,
+                  tooltip: 'Delete transaction',
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _GymExpensesViewer extends StatelessWidget {
+  final List<GymExpenseRecord> expenses;
+
+  const _GymExpensesViewer({required this.expenses});
+
+  @override
+  Widget build(BuildContext context) {
+    if (expenses.isEmpty) {
+      return const _EmptyStateCard(message: 'No gym expenses recorded yet.');
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppThemeDark.secondary,
         borderRadius: BorderRadius.circular(GeneralSizes.borderRadiusM),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: child,
+        border: Border.all(color: AppThemeDark.borderPrimary),
+      ),
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: expenses.length,
+        separatorBuilder: (_, __) => Divider(
+          color: AppThemeDark.borderPrimary.withValues(alpha: 0.5),
+          height: 1,
+        ),
+        itemBuilder: (context, index) {
+          final expense = expenses[index];
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: AppThemeDark.warning.withValues(alpha: 0.12),
+                  child: const Icon(
+                    Icons.shopping_bag_outlined,
+                    color: AppThemeDark.warning,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        expense.description,
+                        style: const TextStyle(
+                          color: AppThemeDark.textWhite,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        expense.category,
+                        style: const TextStyle(
+                          color: AppThemeDark.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _MethodBadge(method: expense.method),
+                const SizedBox(width: 20),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '-${_formatCurrency(expense.amount)}',
+                      style: const TextStyle(
+                        color: AppThemeDark.warning,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      _formatDate(expense.date),
+                      style: const TextStyle(
+                        color: AppThemeDark.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _MethodBadge extends StatelessWidget {
+  final String method;
+
+  const _MethodBadge({required this.method});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppThemeDark.primaryBackground,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppThemeDark.borderPrimary),
+      ),
+      child: Text(
+        method,
+        style: const TextStyle(
+          color: AppThemeDark.textSecondary,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
         ),
       ),
     );
   }
 }
 
-class _PaymentMethod extends StatelessWidget {
-  final String method;
+class _EmptyStateCard extends StatelessWidget {
+  final String message;
 
-  const _PaymentMethod({required this.method});
+  const _EmptyStateCard({required this.message});
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      method,
-      style: const TextStyle(color: AppThemeDark.textSecondary),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 28),
+      decoration: BoxDecoration(
+        color: AppThemeDark.secondary,
+        borderRadius: BorderRadius.circular(GeneralSizes.borderRadiusM),
+        border: Border.all(color: AppThemeDark.borderPrimary),
+      ),
+      child: Center(
+        child: Text(
+          message,
+          style: const TextStyle(color: AppThemeDark.textSecondary),
+        ),
+      ),
     );
   }
 }
@@ -556,25 +649,27 @@ class _ReportDialogState extends State<_ReportDialog> {
             ),
             const SizedBox(height: 10),
             SegmentedButton<_ReportSource>(
-              segments: [
+              segments: const [
                 ButtonSegment(
                   value: _ReportSource.memberPayments,
-                  label: const Text('Member payments'),
-                  icon: const Icon(Icons.people_alt_outlined),
+                  label: Text('Member payments'),
+                  icon: Icon(Icons.people_alt_outlined),
                 ),
                 ButtonSegment(
                   value: _ReportSource.gymExpenses,
-                  label: const Text('Gym expenses'),
-                  icon: const Icon(Icons.storefront_outlined),
+                  label: Text('Gym expenses'),
+                  icon: Icon(Icons.storefront_outlined),
                 ),
               ],
               selected: {_source},
               style: ButtonStyle(
-                foregroundColor: WidgetStatePropertyAll(AppThemeDark.textWhite),
+                foregroundColor: const WidgetStatePropertyAll(
+                  AppThemeDark.textWhite,
+                ),
                 overlayColor: WidgetStatePropertyAll(
                   AppThemeDark.primary.withValues(alpha: 0.12),
                 ),
-                side: WidgetStatePropertyAll(
+                side: const WidgetStatePropertyAll(
                   BorderSide(color: AppThemeDark.borderPrimary),
                 ),
               ),
@@ -641,7 +736,7 @@ class _DateButton extends StatelessWidget {
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
         foregroundColor: AppThemeDark.textWhite,
-        side: BorderSide(color: AppThemeDark.borderPrimary),
+        side: const BorderSide(color: AppThemeDark.borderPrimary),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       ),
       child: Column(

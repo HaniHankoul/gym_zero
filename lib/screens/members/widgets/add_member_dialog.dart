@@ -44,8 +44,13 @@ class _AddMemberDialogState extends State<AddMemberDialog> {
   void _saveMember() {
     if (!_formKey.currentState!.validate()) return;
 
-    final duration = int.tryParse(_durationController.text.trim());
-    final price = double.tryParse(_priceController.text.trim());
+    final durationText = _durationController.text.trim();
+    final priceText = _priceController.text.trim().replaceAll(',', '.');
+
+    final duration = durationText.isNotEmpty
+        ? int.tryParse(durationText)
+        : null;
+    final price = priceText.isNotEmpty ? double.tryParse(priceText) : 0.0;
 
     Navigator.of(context).pop(
       NewMemberPayload(
@@ -62,7 +67,7 @@ class _AddMemberDialogState extends State<AddMemberDialog> {
     if (text.isEmpty && _priceController.text.trim().isEmpty) return null;
     final duration = int.tryParse(text);
     if (duration == null || duration <= 0) {
-      return 'Enter a number of months';
+      return 'Enter valid months';
     }
     return null;
   }
@@ -70,7 +75,7 @@ class _AddMemberDialogState extends State<AddMemberDialog> {
   String? _validatePrice(String? value) {
     final text = value?.trim() ?? '';
     if (text.isEmpty && _durationController.text.trim().isEmpty) return null;
-    final price = double.tryParse(text);
+    final price = double.tryParse(text.replaceAll(',', '.'));
     if (price == null || price < 0) return 'Enter a valid price';
     return null;
   }

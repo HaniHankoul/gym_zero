@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../shared/database/db_init.dart';
+import 'payment_provider.dart';
 
 class MemberDisplayModel {
   final int id;
@@ -36,15 +37,12 @@ class MemberDisplayModel {
   }
 }
 
-// Database instance provider
 final gymDatabaseProvider = Provider<GymDatabase>((ref) {
   return GymDatabase.instance;
 });
 
-// Search filter state provider
 final memberSearchQueryProvider = StateProvider<String>((ref) => '');
 
-// Members AsyncNotifier managing DB CRUD operations
 class MembersNotifier extends AsyncNotifier<List<MemberDisplayModel>> {
   @override
   Future<List<MemberDisplayModel>> build() async {
@@ -54,7 +52,6 @@ class MembersNotifier extends AsyncNotifier<List<MemberDisplayModel>> {
   Future<List<MemberDisplayModel>> _fetchMembersWithSubscriptions() async {
     final db = await ref.read(gymDatabaseProvider).database;
 
-    // LEFT JOIN gets all members and attaches their most recent sub_history and sub details
     final rows = await db.rawQuery('''
       SELECT 
         m.member_id,
@@ -82,12 +79,12 @@ class MembersNotifier extends AsyncNotifier<List<MemberDisplayModel>> {
     required int age,
     int? durationMonths,
     double? price,
-    int createdByUserId = 1, // Default fallback user_id
+    int createdByUserId = 1,
   }) async {
     final db = await ref.read(gymDatabaseProvider).database;
 
     await db.transaction((txn) async {
-      // 1. Ensure fallback user exists if foreign key requires it
+      // Ensure user ID exists for foreign key constraints
       final userCheck = await txn.query(
         'users',
         where: 'user_id = ?',
@@ -101,14 +98,14 @@ class MembersNotifier extends AsyncNotifier<List<MemberDisplayModel>> {
         }, conflictAlgorithm: ConflictAlgorithm.ignore);
       }
 
-      // 2. Insert member
+      // Insert member
       final memberId = await txn.insert('members', {
         'name': name,
         'age': age,
         'created_by_user_id': createdByUserId,
       });
 
-      // 3. Insert subscription, history, and payment if provided
+      // Insert subscription, history, and payment
       if (durationMonths != null && durationMonths > 0) {
         final subCost = price ?? 0.0;
         final subName = '$durationMonths Months Plan';
@@ -134,24 +131,27 @@ class MembersNotifier extends AsyncNotifier<List<MemberDisplayModel>> {
           'sub_id': subId,
         });
 
-        if (subCost > 0) {
-          await txn.insert('payments', {
-            'amount': subCost,
-            'payment_date': startDate,
-            'method': 'Cash',
-            'member_id': memberId,
-          });
-        }
+        await txn.insert('payments', {
+          'amount': subCost,
+          'payment_date': startDate,
+          'method': 'Cash',
+          'member_id': memberId,
+        });
       }
     });
 
+    // Refresh member state
     state = await AsyncValue.guard(() => _fetchMembersWithSubscriptions());
+
+    // Invalidate payments cache to force immediate UI update
+    ref.invalidate(paymentsProvider);
   }
 
   Future<void> deleteMember(int memberId) async {
     final gymDb = ref.read(gymDatabaseProvider);
     await gymDb.deleteMember(memberId);
     state = await AsyncValue.guard(() => _fetchMembersWithSubscriptions());
+    ref.invalidate(paymentsProvider);
   }
 }
 
@@ -160,7 +160,6 @@ final membersProvider =
       () => MembersNotifier(),
     );
 
-// Filtered members list provider based on the search query
 final filteredMembersProvider = Provider<AsyncValue<List<MemberDisplayModel>>>((
   ref,
 ) {

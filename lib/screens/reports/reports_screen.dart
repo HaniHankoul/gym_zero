@@ -1,79 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/constants/general_sizes.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/custom_text.dart';
+import '../../providers/reports_provider.dart';
 
-enum _ReportType { membership, payments, revenue }
-
-class _ReportRecord {
-  final String name;
-  final _ReportType type;
-  final DateTime createdAt;
-  final String period;
-  final String format;
-  final String status;
-
-  const _ReportRecord({
-    required this.name,
-    required this.type,
-    required this.createdAt,
-    required this.period,
-    required this.format,
-    required this.status,
-  });
-}
-
-class ReportsScreen extends StatefulWidget {
+class ReportsScreen extends ConsumerWidget {
   const ReportsScreen({super.key});
 
   @override
-  State<ReportsScreen> createState() => _ReportsScreenState();
-}
-
-class _ReportsScreenState extends State<ReportsScreen> {
-  final List<_ReportRecord> _reports = [
-    _ReportRecord(
-      name: 'September revenue summary',
-      type: _ReportType.revenue,
-      createdAt: DateTime(2026, 9, 30, 16, 20),
-      period: '01 Sep - 30 Sep 2026',
-      format: 'PDF',
-      status: 'Ready',
-    ),
-    _ReportRecord(
-      name: 'September payments report',
-      type: _ReportType.payments,
-      createdAt: DateTime(2026, 9, 28, 10, 5),
-      period: '01 Sep - 30 Sep 2026',
-      format: 'CSV',
-      status: 'Ready',
-    ),
-    _ReportRecord(
-      name: 'Active memberships overview',
-      type: _ReportType.membership,
-      createdAt: DateTime(2026, 9, 15, 9, 40),
-      period: '01 Sep - 15 Sep 2026',
-      format: 'PDF',
-      status: 'Ready',
-    ),
-    _ReportRecord(
-      name: 'August revenue summary',
-      type: _ReportType.revenue,
-      createdAt: DateTime(2026, 8, 31, 14, 15),
-      period: '01 Aug - 31 Aug 2026',
-      format: 'PDF',
-      status: 'Ready',
-    ),
-  ];
-
-  _ReportType? _selectedFilter;
-
-  @override
-  Widget build(BuildContext context) {
-    final visibleReports = _selectedFilter == null
-        ? _reports
-        : _reports.where((report) => report.type == _selectedFilter).toList();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final allReportsAsync = ref.watch(reportsProvider);
+    final filteredReportsAsync = ref.watch(filteredReportsProvider);
+    final selectedFilter = ref.watch(reportFilterProvider);
 
     return Container(
       color: AppThemeDark.primaryBackground,
@@ -82,9 +22,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _PageHeader(onGenerate: _showGenerateDialog),
+            _PageHeader(onGenerate: () => _showGenerateDialog(context, ref)),
             const SizedBox(height: 24),
-            _SummaryRow(reportCount: _reports.length),
+            _SummaryRow(reports: allReportsAsync.value ?? []),
             const SizedBox(height: 30),
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -99,16 +39,36 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   ),
                 ),
                 _FilterMenu(
-                  selected: _selectedFilter,
-                  onChanged: (value) => setState(() => _selectedFilter = value),
+                  selected: selectedFilter,
+                  onChanged: (value) =>
+                      ref.read(reportFilterProvider.notifier).state = value,
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            _ReportsTable(
-              reports: visibleReports,
-              onDownload: (report) =>
-                  _showMessage('${report.name} downloaded.'),
+            filteredReportsAsync.when(
+              loading: () => const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(32.0),
+                  child: CircularProgressIndicator(),
+                ),
+              ),
+              error: (err, _) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32.0),
+                  child: CustomText(
+                    text: 'Failed to load reports: $err',
+                    color: AppThemeDark.error,
+                  ),
+                ),
+              ),
+              data: (reports) => _ReportsTable(
+                reports: reports,
+                onDownload: (report) =>
+                    _showMessage(context, '${report.name} downloaded.'),
+                onDelete: (id) =>
+                    ref.read(reportsProvider.notifier).deleteReport(id),
+              ),
             ),
           ],
         ),
@@ -116,17 +76,28 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  Future<void> _showGenerateDialog() async {
-    final report = await showDialog<_ReportRecord>(
+  Future<void> _showGenerateDialog(BuildContext context, WidgetRef ref) async {
+    final reportData = await showDialog<_NewReportData>(
       context: context,
       builder: (context) => const _GenerateReportDialog(),
     );
-    if (!mounted || report == null) return;
-    setState(() => _reports.insert(0, report));
-    _showMessage('${report.name} is ready.');
+    if (!context.mounted || reportData == null) return;
+
+    await ref
+        .read(reportsProvider.notifier)
+        .addReport(
+          name: reportData.name,
+          type: reportData.type,
+          period: reportData.period,
+          format: reportData.format,
+        );
+
+    if (context.mounted) {
+      _showMessage(context, '${reportData.name} is ready.');
+    }
   }
 
-  void _showMessage(String message) {
+  void _showMessage(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
   }
@@ -183,12 +154,21 @@ class _PageHeader extends StatelessWidget {
 }
 
 class _SummaryRow extends StatelessWidget {
-  final int reportCount;
+  final List<ReportRecord> reports;
 
-  const _SummaryRow({required this.reportCount});
+  const _SummaryRow({required this.reports});
 
   @override
   Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final thisMonthCount = reports.where((r) {
+      return r.createdAt.year == now.year && r.createdAt.month == now.month;
+    }).length;
+
+    final latestReport = reports.isNotEmpty
+        ? _formatRelativeDate(reports.first.createdAt)
+        : 'None';
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth < 650
@@ -201,7 +181,7 @@ class _SummaryRow extends StatelessWidget {
             _SummaryCard(
               width: width,
               label: 'Total reports',
-              value: '$reportCount',
+              value: '${reports.length}',
               detail: 'Generated reports',
               icon: Icons.description_outlined,
               color: AppThemeDark.primary,
@@ -209,7 +189,7 @@ class _SummaryRow extends StatelessWidget {
             _SummaryCard(
               width: width,
               label: 'This month',
-              value: '3',
+              value: '$thisMonthCount',
               detail: 'Reports created',
               icon: Icons.calendar_month_outlined,
               color: AppThemeDark.info,
@@ -217,8 +197,8 @@ class _SummaryRow extends StatelessWidget {
             _SummaryCard(
               width: width,
               label: 'Latest report',
-              value: 'Today',
-              detail: 'Ready to download',
+              value: latestReport,
+              detail: reports.isNotEmpty ? 'Ready to download' : 'No entries',
               icon: Icons.check_circle_outline,
               color: AppThemeDark.success,
             ),
@@ -226,6 +206,16 @@ class _SummaryRow extends StatelessWidget {
         );
       },
     );
+  }
+
+  String _formatRelativeDate(DateTime date) {
+    final now = DateTime.now();
+    if (date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day) {
+      return 'Today';
+    }
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}';
   }
 }
 
@@ -292,26 +282,29 @@ class _SummaryCard extends StatelessWidget {
 }
 
 class _FilterMenu extends StatelessWidget {
-  final _ReportType? selected;
-  final ValueChanged<_ReportType?> onChanged;
+  final ReportType? selected;
+  final ValueChanged<ReportType?> onChanged;
 
   const _FilterMenu({required this.selected, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
-    return DropdownButton<_ReportType?>(
+    return DropdownButton<ReportType?>(
       value: selected,
       dropdownColor: AppThemeDark.secondary,
       underline: const SizedBox.shrink(),
-      hint: const Text('All reports'),
+      hint: const Text(
+        'All reports',
+        style: TextStyle(color: AppThemeDark.textWhite),
+      ),
       items: const [
         DropdownMenuItem(value: null, child: Text('All reports')),
         DropdownMenuItem(
-          value: _ReportType.membership,
+          value: ReportType.membership,
           child: Text('Membership'),
         ),
-        DropdownMenuItem(value: _ReportType.payments, child: Text('Payments')),
-        DropdownMenuItem(value: _ReportType.revenue, child: Text('Revenue')),
+        DropdownMenuItem(value: ReportType.payments, child: Text('Payments')),
+        DropdownMenuItem(value: ReportType.revenue, child: Text('Revenue')),
       ],
       onChanged: onChanged,
     );
@@ -319,10 +312,15 @@ class _FilterMenu extends StatelessWidget {
 }
 
 class _ReportsTable extends StatelessWidget {
-  final List<_ReportRecord> reports;
-  final ValueChanged<_ReportRecord> onDownload;
+  final List<ReportRecord> reports;
+  final ValueChanged<ReportRecord> onDownload;
+  final ValueChanged<int> onDelete;
 
-  const _ReportsTable({required this.reports, required this.onDownload});
+  const _ReportsTable({
+    required this.reports,
+    required this.onDownload,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -338,7 +336,7 @@ class _ReportsTable extends StatelessWidget {
               padding: EdgeInsets.all(32),
               child: Center(
                 child: Text(
-                  'No reports found for this category.',
+                  'No reports found in history.',
                   style: TextStyle(color: AppThemeDark.textSecondary),
                 ),
               ),
@@ -354,7 +352,7 @@ class _ReportsTable extends StatelessWidget {
                     DataColumn(label: Text('Created')),
                     DataColumn(label: Text('Format')),
                     DataColumn(label: Text('Status')),
-                    DataColumn(label: Text('')),
+                    DataColumn(label: Text('Actions')),
                   ],
                   rows: [
                     for (final report in reports)
@@ -366,10 +364,26 @@ class _ReportsTable extends StatelessWidget {
                           DataCell(_FormatBadge(format: report.format)),
                           DataCell(_StatusBadge(status: report.status)),
                           DataCell(
-                            IconButton(
-                              tooltip: 'Download report',
-                              onPressed: () => onDownload(report),
-                              icon: const Icon(Icons.download_outlined),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  tooltip: 'Download report',
+                                  onPressed: () => onDownload(report),
+                                  icon: const Icon(
+                                    Icons.download_outlined,
+                                    size: 20,
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: 'Delete report',
+                                  onPressed: () => onDelete(report.id),
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    size: 20,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -383,7 +397,7 @@ class _ReportsTable extends StatelessWidget {
 }
 
 class _ReportName extends StatelessWidget {
-  final _ReportRecord report;
+  final ReportRecord report;
 
   const _ReportName({required this.report});
 
@@ -425,6 +439,20 @@ class _StatusBadge extends StatelessWidget {
   }
 }
 
+class _NewReportData {
+  final String name;
+  final ReportType type;
+  final String period;
+  final String format;
+
+  const _NewReportData({
+    required this.name,
+    required this.type,
+    required this.period,
+    required this.format,
+  });
+}
+
 class _GenerateReportDialog extends StatefulWidget {
   const _GenerateReportDialog();
 
@@ -435,7 +463,7 @@ class _GenerateReportDialog extends StatefulWidget {
 class _GenerateReportDialogState extends State<_GenerateReportDialog> {
   DateTime _start = DateTime(2026, 10, 1);
   DateTime _end = DateTime(2026, 10, 31);
-  _ReportType _type = _ReportType.revenue;
+  ReportType _type = ReportType.revenue;
   String _format = 'PDF';
 
   Future<void> _pickDate({required bool start}) async {
@@ -508,7 +536,7 @@ class _GenerateReportDialogState extends State<_GenerateReportDialog> {
               fontWeight: FontWeight.w700,
             ),
             const SizedBox(height: 8),
-            DropdownButtonFormField<_ReportType>(
+            DropdownButtonFormField<ReportType>(
               initialValue: _type,
               dropdownColor: AppThemeDark.secondary,
               style: const TextStyle(color: AppThemeDark.textWhite),
@@ -527,15 +555,15 @@ class _GenerateReportDialogState extends State<_GenerateReportDialog> {
               ),
               items: const [
                 DropdownMenuItem(
-                  value: _ReportType.revenue,
+                  value: ReportType.revenue,
                   child: Text('Revenue summary'),
                 ),
                 DropdownMenuItem(
-                  value: _ReportType.payments,
+                  value: ReportType.payments,
                   child: Text('Payments report'),
                 ),
                 DropdownMenuItem(
-                  value: _ReportType.membership,
+                  value: ReportType.membership,
                   child: Text('Membership overview'),
                 ),
               ],
@@ -554,11 +582,13 @@ class _GenerateReportDialogState extends State<_GenerateReportDialog> {
               ],
               selected: {_format},
               style: ButtonStyle(
-                foregroundColor: WidgetStatePropertyAll(AppThemeDark.textWhite),
+                foregroundColor: const WidgetStatePropertyAll(
+                  AppThemeDark.textWhite,
+                ),
                 overlayColor: WidgetStatePropertyAll(
                   AppThemeDark.primary.withValues(alpha: 0.12),
                 ),
-                side: WidgetStatePropertyAll(
+                side: const WidgetStatePropertyAll(
                   BorderSide(color: AppThemeDark.borderPrimary),
                 ),
               ),
@@ -575,7 +605,17 @@ class _GenerateReportDialogState extends State<_GenerateReportDialog> {
           child: const Text('Cancel'),
         ),
         FilledButton(
-          onPressed: _generate,
+          onPressed: () {
+            Navigator.pop(
+              context,
+              _NewReportData(
+                name: '${_typeLabel(_type)} - ${_formatDate(_start)}',
+                type: _type,
+                period: '${_formatDate(_start)} - ${_formatDate(_end)}',
+                format: _format,
+              ),
+            );
+          },
           style: FilledButton.styleFrom(
             backgroundColor: AppThemeDark.primary,
             foregroundColor: AppThemeDark.textPrimary,
@@ -583,20 +623,6 @@ class _GenerateReportDialogState extends State<_GenerateReportDialog> {
           child: const Text('Generate report'),
         ),
       ],
-    );
-  }
-
-  void _generate() {
-    Navigator.pop(
-      context,
-      _ReportRecord(
-        name: '${_typeLabel(_type)} - ${_formatDate(_start)}',
-        type: _type,
-        createdAt: DateTime(2026, 10, 31, 11, 30),
-        period: '${_formatDate(_start)} - ${_formatDate(_end)}',
-        format: _format,
-        status: 'Ready',
-      ),
     );
   }
 }
@@ -633,19 +659,19 @@ class _DateButton extends StatelessWidget {
   }
 }
 
-IconData _iconForType(_ReportType type) {
+IconData _iconForType(ReportType type) {
   return switch (type) {
-    _ReportType.membership => Icons.card_membership_outlined,
-    _ReportType.payments => Icons.receipt_long_outlined,
-    _ReportType.revenue => Icons.trending_up,
+    ReportType.membership => Icons.card_membership_outlined,
+    ReportType.payments => Icons.receipt_long_outlined,
+    ReportType.revenue => Icons.trending_up,
   };
 }
 
-String _typeLabel(_ReportType type) {
+String _typeLabel(ReportType type) {
   return switch (type) {
-    _ReportType.membership => 'Membership overview',
-    _ReportType.payments => 'Payments report',
-    _ReportType.revenue => 'Revenue summary',
+    ReportType.membership => 'Membership overview',
+    ReportType.payments => 'Payments report',
+    ReportType.revenue => 'Revenue summary',
   };
 }
 

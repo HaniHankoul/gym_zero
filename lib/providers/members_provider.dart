@@ -13,6 +13,8 @@ class MemberDisplayModel {
   final String status;
   final String expiryDate;
   final double? price;
+  final int? subId;
+  final int? subHistoryId;
 
   const MemberDisplayModel({
     required this.id,
@@ -22,7 +24,11 @@ class MemberDisplayModel {
     required this.status,
     required this.expiryDate,
     this.price,
+    this.subId,
+    this.subHistoryId,
   });
+
+  bool get hasActiveSubscription => status.toLowerCase() == 'active';
 
   factory MemberDisplayModel.fromMap(Map<String, Object?> map) {
     return MemberDisplayModel(
@@ -33,6 +39,8 @@ class MemberDisplayModel {
       status: (map['status'] as String?) ?? 'Inactive',
       expiryDate: (map['end_date'] as String?) ?? '-',
       price: map['price'] != null ? (map['price'] as num).toDouble() : null,
+      subId: map['sub_id'] as int?,
+      subHistoryId: map['sub_history_id'] as int?,
     );
   }
 }
@@ -41,7 +49,9 @@ final gymDatabaseProvider = Provider<GymDatabase>((ref) {
   return GymDatabase.instance;
 });
 
-final memberSearchQueryProvider = StateProvider<String>((ref) => '');
+final memberSearchQueryProvider = StateProvider.autoDispose<String>(
+  (ref) => '',
+);
 
 class MembersNotifier extends AsyncNotifier<List<MemberDisplayModel>> {
   @override
@@ -57,8 +67,10 @@ class MembersNotifier extends AsyncNotifier<List<MemberDisplayModel>> {
         m.member_id,
         m.name,
         m.age,
+        s.sub_id,
         s.name AS sub_name,
         s.price,
+        sh.id AS sub_history_id,
         sh.end_date,
         COALESCE(sh.status, 'Inactive') AS status
       FROM members m
@@ -84,7 +96,6 @@ class MembersNotifier extends AsyncNotifier<List<MemberDisplayModel>> {
     final db = await ref.read(gymDatabaseProvider).database;
 
     await db.transaction((txn) async {
-      // Ensure user ID exists for foreign key constraints
       final userCheck = await txn.query(
         'users',
         where: 'user_id = ?',
@@ -98,14 +109,12 @@ class MembersNotifier extends AsyncNotifier<List<MemberDisplayModel>> {
         }, conflictAlgorithm: ConflictAlgorithm.ignore);
       }
 
-      // Insert member
       final memberId = await txn.insert('members', {
         'name': name,
         'age': age,
         'created_by_user_id': createdByUserId,
       });
 
-      // Insert subscription, history, and payment
       if (durationMonths != null && durationMonths > 0) {
         final subCost = price ?? 0.0;
         final subName = '$durationMonths Months Plan';
@@ -140,11 +149,97 @@ class MembersNotifier extends AsyncNotifier<List<MemberDisplayModel>> {
       }
     });
 
-    // Refresh member state
     state = await AsyncValue.guard(() => _fetchMembersWithSubscriptions());
-
-    // Invalidate payments cache to force immediate UI update
     ref.invalidate(paymentsProvider);
+  }
+
+  Future<void> addOrRenewSubscription({
+    required int memberId,
+    required int durationMonths,
+    required double price,
+  }) async {
+    final db = await ref.read(gymDatabaseProvider).database;
+
+    await db.transaction((txn) async {
+      final subCost = price;
+      final subName = '$durationMonths Months Plan';
+
+      final subId = await txn.insert('subs', {
+        'name': subName,
+        'duration_months': durationMonths,
+        'price': subCost,
+      });
+
+      final now = DateTime.now();
+      final startDate =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final expiry = DateTime(now.year, now.month + durationMonths, now.day);
+      final endDate =
+          '${expiry.year}-${expiry.month.toString().padLeft(2, '0')}-${expiry.day.toString().padLeft(2, '0')}';
+
+      await txn.insert('sub_history', {
+        'start_date': startDate,
+        'end_date': endDate,
+        'status': 'Active',
+        'member_id': memberId,
+        'sub_id': subId,
+      });
+
+      await txn.insert('payments', {
+        'amount': subCost,
+        'payment_date': startDate,
+        'method': 'Cash',
+        'member_id': memberId,
+      });
+    });
+
+    state = await AsyncValue.guard(() => _fetchMembersWithSubscriptions());
+    ref.invalidate(paymentsProvider);
+  }
+
+  Future<void> editSubscription({
+    required int subId,
+    required int subHistoryId,
+    required int durationMonths,
+    required double price,
+  }) async {
+    final db = await ref.read(gymDatabaseProvider).database;
+
+    await db.transaction((txn) async {
+      final subName = '$durationMonths Months Plan';
+      await txn.update(
+        'subs',
+        {'name': subName, 'duration_months': durationMonths, 'price': price},
+        where: 'sub_id = ?',
+        whereArgs: [subId],
+      );
+
+      final now = DateTime.now();
+      final expiry = DateTime(now.year, now.month + durationMonths, now.day);
+      final endDate =
+          '${expiry.year}-${expiry.month.toString().padLeft(2, '0')}-${expiry.day.toString().padLeft(2, '0')}';
+
+      await txn.update(
+        'sub_history',
+        {'end_date': endDate, 'status': 'Active'},
+        where: 'id = ?',
+        whereArgs: [subHistoryId],
+      );
+    });
+
+    state = await AsyncValue.guard(() => _fetchMembersWithSubscriptions());
+    ref.invalidate(paymentsProvider);
+  }
+
+  Future<void> cancelSubscription(int subHistoryId) async {
+    final db = await ref.read(gymDatabaseProvider).database;
+    await db.update(
+      'sub_history',
+      {'status': 'Cancelled'},
+      where: 'id = ?',
+      whereArgs: [subHistoryId],
+    );
+    state = await AsyncValue.guard(() => _fetchMembersWithSubscriptions());
   }
 
   Future<void> deleteMember(int memberId) async {
@@ -160,14 +255,15 @@ final membersProvider =
       () => MembersNotifier(),
     );
 
-final filteredMembersProvider = Provider<AsyncValue<List<MemberDisplayModel>>>((
-  ref,
-) {
-  final query = ref.watch(memberSearchQueryProvider).toLowerCase();
-  final membersAsync = ref.watch(membersProvider);
+final filteredMembersProvider =
+    Provider.autoDispose<AsyncValue<List<MemberDisplayModel>>>((ref) {
+      final query = ref.watch(memberSearchQueryProvider).toLowerCase();
+      final membersAsync = ref.watch(membersProvider);
 
-  return membersAsync.whenData((members) {
-    if (query.isEmpty) return members;
-    return members.where((m) => m.name.toLowerCase().contains(query)).toList();
-  });
-});
+      return membersAsync.whenData((members) {
+        if (query.isEmpty) return members;
+        return members
+            .where((m) => m.name.toLowerCase().contains(query))
+            .toList();
+      });
+    });

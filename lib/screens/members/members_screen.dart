@@ -48,6 +48,15 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
         );
   }
 
+  void _showMemberDetails(MemberDisplayModel member) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _MemberDetailsSheet(member: member),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final filteredMembersAsync = ref.watch(filteredMembersProvider);
@@ -66,18 +75,28 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
                   onAddMember: _showAddMemberDialog,
                 ),
                 const SizedBox(height: 24),
-                _MembersToolbar(
-                  controller: _searchController,
-                  onSearchChanged: (value) {
-                    ref.read(memberSearchQueryProvider.notifier).state = value
-                        .trim();
-                  },
+                // Search bar only: No toolbar buttons
+                SizedBox(
+                  width: constraints.maxWidth < 600 ? double.infinity : 360,
+                  child: CustomTextField(
+                    controller: _searchController,
+                    onFieldSubmitted: (value) {
+                      ref.read(memberSearchQueryProvider.notifier).state = value
+                          .trim();
+                    },
+                    hintText: 'Search by member name...',
+                    icon: HugeIcons.strokeRoundedSearch02,
+                    prefixCallBack: () {
+                      _searchController.clear();
+                      ref.read(memberSearchQueryProvider.notifier).state = '';
+                    },
+                  ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 filteredMembersAsync.when(
                   loading: () => const Center(
                     child: Padding(
-                      padding: EdgeInsets.all(32.0),
+                      padding: EdgeInsets.all(40.0),
                       child: CircularProgressIndicator(),
                     ),
                   ),
@@ -90,12 +109,45 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
                       ),
                     ),
                   ),
-                  data: (members) => _MembersTable(
-                    members: members,
-                    availableWidth: constraints.maxWidth,
-                    onDelete: (id) =>
-                        ref.read(membersProvider.notifier).deleteMember(id),
-                  ),
+                  data: (members) {
+                    if (members.isEmpty) {
+                      return Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(40),
+                        decoration: BoxDecoration(
+                          color: AppThemeDark.secondary,
+                          borderRadius: BorderRadius.circular(
+                            GeneralSizes.borderRadiusM,
+                          ),
+                          border: Border.all(color: AppThemeDark.borderPrimary),
+                        ),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.person_off,
+                              size: 48,
+                              color: AppThemeDark.textSecondary.withValues(
+                                alpha: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'No members found',
+                              style: TextStyle(
+                                color: AppThemeDark.textSecondary,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    return _MembersCardGrid(
+                      members: members,
+                      onMemberTap: _showMemberDetails,
+                    );
+                  },
                 ),
               ],
             ),
@@ -130,7 +182,7 @@ class _MembersHeader extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                '$memberCount members in your gym',
+                '$memberCount members registered in gym',
                 style: const TextStyle(color: AppThemeDark.textSecondary),
               ),
             ],
@@ -145,11 +197,12 @@ class _MembersHeader extends StatelessWidget {
           ),
           label: const Text(
             'Add member',
-            style: TextStyle(color: Colors.black),
+            style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
           ),
           style: FilledButton.styleFrom(
             backgroundColor: AppThemeDark.primary,
             foregroundColor: AppThemeDark.textPrimary,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
           ),
         ),
       ],
@@ -157,166 +210,592 @@ class _MembersHeader extends StatelessWidget {
   }
 }
 
-class _MembersToolbar extends StatelessWidget {
-  final TextEditingController controller;
-  final ValueChanged<String> onSearchChanged;
-
-  const _MembersToolbar({
-    required this.controller,
-    required this.onSearchChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: GeneralSizes.mediumSize,
-      runSpacing: GeneralSizes.mediumSize,
-      children: [
-        SizedBox(
-          width: 280,
-          child: CustomTextField(
-            controller: controller,
-            onFieldSubmitted: onSearchChanged,
-            hintText: 'Search members',
-            icon: HugeIcons.strokeRoundedSearch02,
-            prefixCallBack: () {
-              controller.clear();
-              onSearchChanged('');
-            },
-          ),
-        ),
-        _ToolbarButton(label: 'Add New Membership', onPressed: () {}),
-        _ToolbarButton(label: 'Renew Membership', onPressed: () {}),
-        _ToolbarButton(label: 'Cancel Membership', onPressed: () {}),
-        _ToolbarButton(label: 'View Expired', onPressed: () {}),
-      ],
-    );
-  }
-}
-
-class _ToolbarButton extends StatelessWidget {
-  final String label;
-  final VoidCallback onPressed;
-
-  const _ToolbarButton({required this.label, required this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton(
-      onPressed: onPressed,
-      style: OutlinedButton.styleFrom(
-        foregroundColor: AppThemeDark.textWhite,
-        side: BorderSide(color: AppThemeDark.primary.withValues(alpha: 0.6)),
-      ),
-      child: Text(label),
-    );
-  }
-}
-
-class _MembersTable extends StatelessWidget {
+class _MembersCardGrid extends StatelessWidget {
   final List<MemberDisplayModel> members;
-  final double availableWidth;
-  final ValueChanged<int> onDelete;
+  final ValueChanged<MemberDisplayModel> onMemberTap;
 
-  const _MembersTable({
-    required this.members,
-    required this.availableWidth,
-    required this.onDelete,
-  });
+  const _MembersCardGrid({required this.members, required this.onMemberTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppThemeDark.secondary,
-        borderRadius: BorderRadius.circular(GeneralSizes.borderRadiusM),
-        border: Border.all(color: AppThemeDark.borderPrimary),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(GeneralSizes.borderRadiusM),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minWidth: availableWidth),
-            child: DataTable(
-              headingRowHeight: 52,
-              dataRowMinHeight: 56,
-              dataRowMaxHeight: 64,
-              horizontalMargin: 20,
-              columnSpacing: 32,
-              headingRowColor: WidgetStatePropertyAll(AppThemeDark.secondary),
-              columns: [
-                DataColumn(label: CustomText(text: 'Name')),
-                DataColumn(label: CustomText(text: 'Age')),
-                DataColumn(label: CustomText(text: 'Membership Type')),
-                DataColumn(label: CustomText(text: 'Price')),
-                DataColumn(label: CustomText(text: 'Status')),
-                DataColumn(label: CustomText(text: 'Expiry Date')),
-                DataColumn(label: CustomText(text: 'Actions')),
-              ],
-              rows: [
-                for (final member in members)
-                  DataRow(
-                    color: WidgetStateProperty.resolveWith(
-                      (states) => member.status.toLowerCase() == 'expired'
-                          ? AppThemeDark.error.withValues(alpha: 0.16)
-                          : null,
-                    ),
-                    cells: [
-                      DataCell(CustomText(text: member.name)),
-                      DataCell(CustomText(text: member.age.toString())),
-                      DataCell(CustomText(text: member.membership)),
-                      DataCell(
-                        CustomText(
-                          text: member.price == null
-                              ? '-'
-                              : member.price!.toStringAsFixed(2),
-                        ),
-                      ),
-                      DataCell(_StatusLabel(status: member.status)),
-                      DataCell(CustomText(text: member.expiryDate)),
-                      DataCell(
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              onPressed: () {},
-                              icon: const Icon(Icons.edit_outlined, size: 19),
-                              tooltip: 'Edit member',
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossAxisCount = constraints.maxWidth < 680
+            ? 1
+            : constraints.maxWidth < 1100
+            ? 2
+            : 3;
+
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            mainAxisExtent: 148,
+          ),
+          itemCount: members.length,
+          itemBuilder: (context, index) {
+            final member = members[index];
+            final isActive = member.status.toLowerCase() == 'active';
+
+            return InkWell(
+              onTap: () => onMemberTap(member),
+              borderRadius: BorderRadius.circular(GeneralSizes.borderRadiusM),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppThemeDark.secondary,
+                  borderRadius: BorderRadius.circular(
+                    GeneralSizes.borderRadiusM,
+                  ),
+                  border: Border.all(
+                    color: isActive
+                        ? AppThemeDark.borderPrimary
+                        : AppThemeDark.error.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 22,
+                          backgroundColor: AppThemeDark.primary.withValues(
+                            alpha: 0.14,
+                          ),
+                          child: Text(
+                            member.name.isNotEmpty
+                                ? member.name[0].toUpperCase()
+                                : 'M',
+                            style: TextStyle(
+                              color: AppThemeDark.primary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
                             ),
-                            IconButton(
-                              onPressed: () => onDelete(member.id),
-                              icon: const Icon(Icons.delete_outline, size: 19),
-                              tooltip: 'Delete member',
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                member.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: AppThemeDark.textWhite,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Age: ${member.age}',
+                                style: const TextStyle(
+                                  color: AppThemeDark.textSecondary,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        _StatusBadge(status: member.status),
+                      ],
+                    ),
+                    const Spacer(),
+                    Divider(
+                      color: AppThemeDark.borderPrimary.withValues(alpha: 0.5),
+                      height: 1,
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.card_membership,
+                              size: 15,
+                              color: AppThemeDark.textSecondary,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              member.membership,
+                              style: const TextStyle(
+                                color: AppThemeDark.textWhite,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ],
                         ),
-                      ),
-                    ],
+                        Text(
+                          member.expiryDate != '-'
+                              ? 'Exp: ${member.expiryDate}'
+                              : 'No expiry',
+                          style: const TextStyle(
+                            color: AppThemeDark.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _MemberDetailsSheet extends ConsumerWidget {
+  final MemberDisplayModel member;
+
+  const _MemberDetailsSheet({required this.member});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isActive = member.status.toLowerCase() == 'active';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppThemeDark.secondary,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        border: Border.all(color: AppThemeDark.borderPrimary),
+      ),
+      padding: const EdgeInsets.all(24),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 48,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppThemeDark.borderPrimary,
+                    borderRadius: BorderRadius.circular(2),
                   ),
-              ],
-            ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Header
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 30,
+                    backgroundColor: AppThemeDark.primary.withValues(
+                      alpha: 0.16,
+                    ),
+                    child: Text(
+                      member.name.isNotEmpty
+                          ? member.name[0].toUpperCase()
+                          : 'M',
+                      style: TextStyle(
+                        color: AppThemeDark.primary,
+                        fontSize: 26,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          member.name,
+                          style: const TextStyle(
+                            color: AppThemeDark.textWhite,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Member ID: #${member.id} • ${member.age} years old',
+                          style: const TextStyle(
+                            color: AppThemeDark.textSecondary,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _StatusBadge(status: member.status),
+                ],
+              ),
+              const SizedBox(height: 24),
+              const Divider(color: AppThemeDark.borderPrimary),
+              const SizedBox(height: 16),
+              // Subscription details info
+              const Text(
+                'Subscription Information',
+                style: TextStyle(
+                  color: AppThemeDark.textWhite,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _DetailRow(label: 'Plan', value: member.membership),
+              _DetailRow(
+                label: 'Price',
+                value: member.price != null
+                    ? '\$${member.price!.toStringAsFixed(2)}'
+                    : 'N/A',
+              ),
+              _DetailRow(label: 'Expiry Date', value: member.expiryDate),
+              _DetailRow(label: 'Status', value: member.status),
+              const SizedBox(height: 28),
+              // Action Buttons
+              const Text(
+                'Actions',
+                style: TextStyle(
+                  color: AppThemeDark.textWhite,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  if (!isActive)
+                    FilledButton.icon(
+                      onPressed: () => _showAddSubscriptionDialog(context, ref),
+                      icon: const Icon(
+                        Icons.add,
+                        color: Colors.black,
+                        size: 18,
+                      ),
+                      label: const Text(
+                        'Add Subscription',
+                        style: TextStyle(color: Colors.black),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppThemeDark.primary,
+                      ),
+                    ),
+                  if (isActive) ...[
+                    OutlinedButton.icon(
+                      onPressed: () =>
+                          _showEditSubscriptionDialog(context, ref),
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      label: const Text('Edit Subscription'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppThemeDark.textWhite,
+                        side: const BorderSide(
+                          color: AppThemeDark.borderPrimary,
+                        ),
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => _confirmCancelSubscription(context, ref),
+                      icon: const Icon(Icons.cancel_outlined, size: 18),
+                      label: const Text('Cancel Subscription'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppThemeDark.warning,
+                        side: BorderSide(
+                          color: AppThemeDark.warning.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ),
+                  ],
+                  OutlinedButton.icon(
+                    onPressed: () => _confirmDeleteMember(context, ref),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    label: const Text('Delete Member'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppThemeDark.error,
+                      side: BorderSide(
+                        color: AppThemeDark.error.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
           ),
         ),
       ),
     );
   }
+
+  void _showAddSubscriptionDialog(BuildContext context, WidgetRef ref) {
+    final durationController = TextEditingController();
+    final priceController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppThemeDark.secondary,
+        title: const Text(
+          'Add Subscription',
+          style: TextStyle(color: AppThemeDark.textWhite),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CustomTextField(
+              controller: durationController,
+              hintText: 'Duration (months)',
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 12),
+            CustomTextField(
+              controller: priceController,
+              hintText: 'Price (\$)',
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final duration = int.tryParse(durationController.text.trim());
+              final price = double.tryParse(
+                priceController.text.trim().replaceAll(',', '.'),
+              );
+              if (duration == null || duration <= 0) return;
+
+              await ref
+                  .read(membersProvider.notifier)
+                  .addOrRenewSubscription(
+                    memberId: member.id,
+                    durationMonths: duration,
+                    price: price ?? 0.0,
+                  );
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (context.mounted) Navigator.pop(context);
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: AppThemeDark.primary,
+            ),
+            child: const Text('Save', style: TextStyle(color: Colors.black)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditSubscriptionDialog(BuildContext context, WidgetRef ref) {
+    if (member.subId == null || member.subHistoryId == null) return;
+
+    final durationController = TextEditingController();
+    final priceController = TextEditingController(
+      text: member.price?.toStringAsFixed(2) ?? '',
+    );
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppThemeDark.secondary,
+        title: const Text(
+          'Edit Subscription',
+          style: TextStyle(color: AppThemeDark.textWhite),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CustomTextField(
+              controller: durationController,
+              hintText: 'New Duration (months from today)',
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 12),
+            CustomTextField(
+              controller: priceController,
+              hintText: 'Updated Price (\$)',
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final duration = int.tryParse(durationController.text.trim());
+              final price = double.tryParse(
+                priceController.text.trim().replaceAll(',', '.'),
+              );
+              if (duration == null || duration <= 0) return;
+
+              await ref
+                  .read(membersProvider.notifier)
+                  .editSubscription(
+                    subId: member.subId!,
+                    subHistoryId: member.subHistoryId!,
+                    durationMonths: duration,
+                    price: price ?? (member.price ?? 0.0),
+                  );
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (context.mounted) Navigator.pop(context);
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: AppThemeDark.primary,
+            ),
+            child: const Text('Save', style: TextStyle(color: Colors.black)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmCancelSubscription(BuildContext context, WidgetRef ref) {
+    if (member.subHistoryId == null) return;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppThemeDark.secondary,
+        title: const Text(
+          'Cancel Subscription',
+          style: TextStyle(color: AppThemeDark.textWhite),
+        ),
+        content: const Text(
+          'Are you sure you want to cancel this active subscription? The status will be updated to Cancelled.',
+          style: TextStyle(color: AppThemeDark.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('No'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              await ref
+                  .read(membersProvider.notifier)
+                  .cancelSubscription(member.subHistoryId!);
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (context.mounted) Navigator.pop(context);
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: AppThemeDark.warning,
+            ),
+            child: const Text(
+              'Yes, Cancel',
+              style: TextStyle(color: Colors.black),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteMember(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppThemeDark.secondary,
+        title: const Text(
+          'Delete Member',
+          style: TextStyle(color: AppThemeDark.textWhite),
+        ),
+        content: Text(
+          'Are you sure you want to delete ${member.name}? This will permanently remove all associated subscription and attendance records.',
+          style: const TextStyle(color: AppThemeDark.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              await ref.read(membersProvider.notifier).deleteMember(member.id);
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (context.mounted) Navigator.pop(context);
+            },
+            style: FilledButton.styleFrom(backgroundColor: AppThemeDark.error),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _StatusLabel extends StatelessWidget {
-  final String status;
+class _DetailRow extends StatelessWidget {
+  final String label;
+  final String value;
 
-  const _StatusLabel({required this.status});
+  const _DetailRow({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
-    final isActive = status.toLowerCase() == 'active';
-    return Text(
-      status,
-      style: TextStyle(
-        color: isActive ? AppThemeDark.success : AppThemeDark.error,
-        fontWeight: FontWeight.w600,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(color: AppThemeDark.textSecondary),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              color: AppThemeDark.textWhite,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  final String status;
+
+  const _StatusBadge({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final lower = status.toLowerCase();
+    final color = lower == 'active'
+        ? AppThemeDark.success
+        : lower == 'cancelled'
+        ? AppThemeDark.warning
+        : AppThemeDark.error;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Text(
+        status,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }

@@ -1,6 +1,4 @@
-import 'dart:core';
 import 'dart:io';
-import 'dart:async';
 
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
@@ -13,9 +11,10 @@ class GymDatabase {
   static final GymDatabase instance = GymDatabase._();
 
   static const _databaseName = 'gym_zero.db';
-  static const _databaseVersion = 2; // Incremented for reports table
+  static const _databaseVersion = 3; // Incremented for expenses table
 
   Database? _database;
+
   Future<Database> get database async {
     if (_database != null) return _database!;
 
@@ -45,6 +44,18 @@ class GymDatabase {
               period TEXT NOT NULL,
               format TEXT NOT NULL,
               status TEXT NOT NULL
+            )
+          ''');
+        }
+        if (oldVersion < 3) {
+          await db.execute('''
+            CREATE TABLE expenses (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              description TEXT NOT NULL,
+              category TEXT NOT NULL,
+              amount REAL NOT NULL,
+              expense_date TEXT NOT NULL,
+              method TEXT NOT NULL
             )
           ''');
         }
@@ -92,6 +103,17 @@ class GymDatabase {
           member_id INTEGER NOT NULL,
           FOREIGN KEY (member_id) REFERENCES members (member_id)
             ON DELETE CASCADE ON UPDATE CASCADE
+        )
+      ''');
+
+      await txn.execute('''
+        CREATE TABLE expenses (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          description TEXT NOT NULL,
+          category TEXT NOT NULL,
+          amount REAL NOT NULL,
+          expense_date TEXT NOT NULL,
+          method TEXT NOT NULL
         )
       ''');
 
@@ -151,7 +173,27 @@ class GymDatabase {
     });
   }
 
-  // Reports Table CRUD methods
+  // Expenses
+  Future<int> insertExpense(Map<String, Object?> expense) async {
+    return (await database).insert('expenses', expense);
+  }
+
+  Future<List> getExpenses() async {
+    return (await database).query(
+      'expenses',
+      orderBy: 'expense_date DESC, id DESC',
+    );
+  }
+
+  Future<int> deleteExpense(int id) async {
+    return (await database).delete(
+      'expenses',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // Reports
   Future<int> insertReport(Map<String, Object?> report) async {
     return (await database).insert('reports', report);
   }
@@ -169,12 +211,14 @@ class GymDatabase {
     return (await database).delete('reports', where: 'id = ?', whereArgs: [id]);
   }
 
-  // --- Other existing methods ---
-  Future<int> insertUser(Map<String, Object?> user) async =>
-      (await database).insert('users', user);
+  // Users
+  Future<int> insertUser(Map<String, Object?> user) async {
+    return (await database).insert('users', user);
+  }
 
-  Future<List> getUsers() async =>
-      (await database).query('users', orderBy: 'name COLLATE NOCASE');
+  Future<List> getUsers() async {
+    return (await database).query('users', orderBy: 'name COLLATE NOCASE');
+  }
 
   Future? getUser(int userId) async {
     final rows = await (await database).query(
@@ -186,25 +230,31 @@ class GymDatabase {
     return rows.isEmpty ? null : rows.first;
   }
 
-  Future<int> updateUser(int userId, Map<String, Object?> values) async =>
-      (await database).update(
-        'users',
-        values,
-        where: 'user_id = ?',
-        whereArgs: [userId],
-      );
+  Future<int> updateUser(int userId, Map<String, Object?> values) async {
+    return (await database).update(
+      'users',
+      values,
+      where: 'user_id = ?',
+      whereArgs: [userId],
+    );
+  }
 
-  Future<int> deleteUser(int userId) async => (await database).delete(
-    'users',
-    where: 'user_id = ?',
-    whereArgs: [userId],
-  );
+  Future<int> deleteUser(int userId) async {
+    return (await database).delete(
+      'users',
+      where: 'user_id = ?',
+      whereArgs: [userId],
+    );
+  }
 
-  Future<int> insertMember(Map<String, Object?> member) async =>
-      (await database).insert('members', member);
+  // Members
+  Future<int> insertMember(Map<String, Object?> member) async {
+    return (await database).insert('members', member);
+  }
 
-  Future<List> getMembers() async =>
-      (await database).query('members', orderBy: 'name COLLATE NOCASE');
+  Future<List> getMembers() async {
+    return (await database).query('members', orderBy: 'name COLLATE NOCASE');
+  }
 
   Future? getMember(int memberId) async {
     final rows = await (await database).query(
@@ -216,25 +266,31 @@ class GymDatabase {
     return rows.isEmpty ? null : rows.first;
   }
 
-  Future<int> updateMember(int memberId, Map<String, Object?> values) async =>
-      (await database).update(
-        'members',
-        values,
-        where: 'member_id = ?',
-        whereArgs: [memberId],
-      );
+  Future<int> updateMember(int memberId, Map<String, Object?> values) async {
+    return (await database).update(
+      'members',
+      values,
+      where: 'member_id = ?',
+      whereArgs: [memberId],
+    );
+  }
 
-  Future<int> deleteMember(int memberId) async => (await database).delete(
-    'members',
-    where: 'member_id = ?',
-    whereArgs: [memberId],
-  );
+  Future<int> deleteMember(int memberId) async {
+    return (await database).delete(
+      'members',
+      where: 'member_id = ?',
+      whereArgs: [memberId],
+    );
+  }
 
-  Future<int> insertSubscription(Map<String, Object?> subscription) async =>
-      (await database).insert('subs', subscription);
+  // Subscriptions
+  Future<int> insertSubscription(Map<String, Object?> subscription) async {
+    return (await database).insert('subs', subscription);
+  }
 
-  Future<List> getSubscriptions() async =>
-      (await database).query('subs', orderBy: 'name COLLATE NOCASE');
+  Future<List> getSubscriptions() async {
+    return (await database).query('subs', orderBy: 'name COLLATE NOCASE');
+  }
 
   Future? getSubscription(int subId) async {
     final rows = await (await database).query(
@@ -246,21 +302,27 @@ class GymDatabase {
     return rows.isEmpty ? null : rows.first;
   }
 
-  Future<int> updateSubscription(
-    int subId,
-    Map<String, Object?> values,
-  ) async => (await database).update(
-    'subs',
-    values,
-    where: 'sub_id = ?',
-    whereArgs: [subId],
-  );
+  Future<int> updateSubscription(int subId, Map<String, Object?> values) async {
+    return (await database).update(
+      'subs',
+      values,
+      where: 'sub_id = ?',
+      whereArgs: [subId],
+    );
+  }
 
-  Future<int> deleteSubscription(int subId) async =>
-      (await database).delete('subs', where: 'sub_id = ?', whereArgs: [subId]);
+  Future<int> deleteSubscription(int subId) async {
+    return (await database).delete(
+      'subs',
+      where: 'sub_id = ?',
+      whereArgs: [subId],
+    );
+  }
 
-  Future<int> insertPayment(Map<String, Object?> payment) async =>
-      (await database).insert('payments', payment);
+  // Payments
+  Future<int> insertPayment(Map<String, Object?> payment) async {
+    return (await database).insert('payments', payment);
+  }
 
   Future<List> getPayments({int? memberId}) async {
     return (await database).query(
@@ -281,22 +343,27 @@ class GymDatabase {
     return rows.isEmpty ? null : rows.first;
   }
 
-  Future<int> updatePayment(int paymentId, Map<String, Object?> values) async =>
-      (await database).update(
-        'payments',
-        values,
-        where: 'pay_id = ?',
-        whereArgs: [paymentId],
-      );
+  Future<int> updatePayment(int paymentId, Map<String, Object?> values) async {
+    return (await database).update(
+      'payments',
+      values,
+      where: 'pay_id = ?',
+      whereArgs: [paymentId],
+    );
+  }
 
-  Future<int> deletePayment(int paymentId) async => (await database).delete(
-    'payments',
-    where: 'pay_id = ?',
-    whereArgs: [paymentId],
-  );
+  Future<int> deletePayment(int paymentId) async {
+    return (await database).delete(
+      'payments',
+      where: 'pay_id = ?',
+      whereArgs: [paymentId],
+    );
+  }
 
-  Future<int> insertAttendance(Map<String, Object?> attendance) async =>
-      (await database).insert('attendance', attendance);
+  // Attendance
+  Future<int> insertAttendance(Map<String, Object?> attendance) async {
+    return (await database).insert('attendance', attendance);
+  }
 
   Future<List> getAttendance({int? memberId}) async {
     return (await database).query(
@@ -320,18 +387,27 @@ class GymDatabase {
   Future<int> updateAttendance(
     int attendanceId,
     Map<String, Object?> values,
-  ) async => (await database).update(
-    'attendance',
-    values,
-    where: 'id = ?',
-    whereArgs: [attendanceId],
-  );
+  ) async {
+    return (await database).update(
+      'attendance',
+      values,
+      where: 'id = ?',
+      whereArgs: [attendanceId],
+    );
+  }
 
-  Future<int> deleteAttendance(int attendanceId) async => (await database)
-      .delete('attendance', where: 'id = ?', whereArgs: [attendanceId]);
+  Future<int> deleteAttendance(int attendanceId) async {
+    return (await database).delete(
+      'attendance',
+      where: 'id = ?',
+      whereArgs: [attendanceId],
+    );
+  }
 
-  Future<int> insertSubscriptionHistory(Map<String, Object?> history) async =>
-      (await database).insert('sub_history', history);
+  // Subscription History
+  Future<int> insertSubscriptionHistory(Map<String, Object?> history) async {
+    return (await database).insert('sub_history', history);
+  }
 
   Future<List> getSubscriptionHistory({int? memberId}) async {
     return (await database).query(
@@ -355,15 +431,22 @@ class GymDatabase {
   Future<int> updateSubscriptionHistory(
     int historyId,
     Map<String, Object?> values,
-  ) async => (await database).update(
-    'sub_history',
-    values,
-    where: 'id = ?',
-    whereArgs: [historyId],
-  );
+  ) async {
+    return (await database).update(
+      'sub_history',
+      values,
+      where: 'id = ?',
+      whereArgs: [historyId],
+    );
+  }
 
-  Future<int> deleteSubscriptionHistory(int historyId) async => (await database)
-      .delete('sub_history', where: 'id = ?', whereArgs: [historyId]);
+  Future<int> deleteSubscriptionHistory(int historyId) async {
+    return (await database).delete(
+      'sub_history',
+      where: 'id = ?',
+      whereArgs: [historyId],
+    );
+  }
 
   Future<void> close() async {
     await _database?.close();

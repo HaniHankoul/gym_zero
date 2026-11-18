@@ -6,6 +6,7 @@ import '../../providers/reports_provider.dart';
 import '../../shared/constants/general_sizes.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/custom_text.dart';
+import '../../shared/widgets/custom_text_field.dart';
 
 enum _ReportSource { memberPayments, gymExpenses }
 
@@ -64,15 +65,59 @@ class PaymentsScreen extends ConsumerWidget {
                   subtitle:
                       '${data.gymExpenses.length} operational costs recorded',
                   icon: Icons.account_balance_wallet_outlined,
+                  trailing: FilledButton.icon(
+                    onPressed: () => _showAddExpenseDialog(context, ref),
+                    icon: const Icon(Icons.add, size: 18, color: Colors.black),
+                    label: const Text(
+                      'Add expense',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppThemeDark.primary,
+                      foregroundColor: AppThemeDark.textPrimary,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 14),
-                _GymExpensesViewer(expenses: data.gymExpenses),
+                _GymExpensesViewer(
+                  expenses: data.gymExpenses,
+                  onDelete: (id) =>
+                      ref.read(paymentsProvider.notifier).deleteExpense(id),
+                ),
               ],
             ),
           );
         },
       ),
     );
+  }
+
+  Future<void> _showAddExpenseDialog(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final expenseData = await showDialog<_NewExpenseData>(
+      context: context,
+      builder: (context) => const _AddExpenseDialog(),
+    );
+    if (!context.mounted || expenseData == null) return;
+
+    await ref
+        .read(paymentsProvider.notifier)
+        .addExpense(
+          description: expenseData.description,
+          category: expenseData.category,
+          amount: expenseData.amount,
+          method: expenseData.method,
+          date: expenseData.date,
+        );
   }
 
   Future<void> _showReportDialog(BuildContext context, WidgetRef ref) async {
@@ -275,11 +320,13 @@ class _SectionTitle extends StatelessWidget {
   final String title;
   final String subtitle;
   final IconData icon;
+  final Widget? trailing;
 
   const _SectionTitle({
     required this.title,
     required this.subtitle,
     required this.icon,
+    this.trailing,
   });
 
   @override
@@ -288,26 +335,29 @@ class _SectionTitle extends StatelessWidget {
       children: [
         Icon(icon, color: AppThemeDark.primary, size: 22),
         const SizedBox(width: 10),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                color: AppThemeDark.textWhite,
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: AppThemeDark.textWhite,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-            Text(
-              subtitle,
-              style: const TextStyle(
-                color: AppThemeDark.textSecondary,
-                fontSize: 12,
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  color: AppThemeDark.textSecondary,
+                  fontSize: 12,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
+        if (trailing != null) trailing!,
       ],
     );
   }
@@ -418,9 +468,10 @@ class _MemberPaymentsViewer extends StatelessWidget {
 }
 
 class _GymExpensesViewer extends StatelessWidget {
-  final List<GymExpenseRecord> expenses;
+  final List<dynamic> expenses;
+  final ValueChanged<int> onDelete;
 
-  const _GymExpensesViewer({required this.expenses});
+  const _GymExpensesViewer({required this.expenses, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -482,7 +533,7 @@ class _GymExpensesViewer extends StatelessWidget {
                   ),
                 ),
                 _MethodBadge(method: expense.method),
-                const SizedBox(width: 20),
+                const SizedBox(width: 16),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -503,6 +554,13 @@ class _GymExpensesViewer extends StatelessWidget {
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(width: 10),
+                IconButton(
+                  onPressed: () => onDelete(expense.id),
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  color: AppThemeDark.textSecondary,
+                  tooltip: 'Delete expense',
                 ),
               ],
             ),
@@ -563,6 +621,290 @@ class _EmptyStateCard extends StatelessWidget {
     );
   }
 }
+
+// --- Add Expense Dialog ---
+
+class _NewExpenseData {
+  final String description;
+  final String category;
+  final double amount;
+  final String method;
+  final DateTime date;
+
+  const _NewExpenseData({
+    required this.description,
+    required this.category,
+    required this.amount,
+    required this.method,
+    required this.date,
+  });
+}
+
+class _AddExpenseDialog extends StatefulWidget {
+  const _AddExpenseDialog();
+
+  @override
+  State<_AddExpenseDialog> createState() => _AddExpenseDialogState();
+}
+
+class _AddExpenseDialogState extends State<_AddExpenseDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _descriptionController = TextEditingController();
+  final _amountController = TextEditingController();
+
+  String _category = 'Facility';
+  String _method = 'Cash';
+  DateTime _date = DateTime.now();
+
+  static const _categories = [
+    'Facility',
+    'Equipment',
+    'Maintenance',
+    'Utilities',
+    'Supplies',
+    'Salaries',
+    'Other',
+  ];
+
+  static const _methods = ['Cash', 'Card', 'Bank transfer'];
+
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _date,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2035),
+    );
+    if (picked != null) {
+      setState(() => _date = picked);
+    }
+  }
+
+  void _save() {
+    if (!_formKey.currentState!.validate()) return;
+    final amount = double.parse(
+      _amountController.text.trim().replaceAll(',', '.'),
+    );
+
+    Navigator.of(context).pop(
+      _NewExpenseData(
+        description: _descriptionController.text.trim(),
+        category: _category,
+        amount: amount,
+        method: _method,
+        date: _date,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppThemeDark.secondary,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: AppThemeDark.borderPrimary),
+      ),
+      title: CustomText(
+        text: 'Add Gym Expense',
+        fontSize: 22,
+        fontWeight: FontWeight.w700,
+      ),
+      content: SizedBox(
+        width: 400,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CustomTextField(
+                  controller: _descriptionController,
+                  autofocus: true,
+                  hintText: 'Description (e.g. Monthly rent)',
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Enter a description'
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                CustomTextField(
+                  controller: _amountController,
+                  hintText: 'Amount (\$)',
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  validator: (value) {
+                    final parsed = double.tryParse(
+                      (value ?? '').trim().replaceAll(',', '.'),
+                    );
+                    if (parsed == null || parsed <= 0) {
+                      return 'Enter a valid amount';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Category',
+                  style: TextStyle(
+                    color: AppThemeDark.textSecondary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<String>(
+                  value: _category,
+                  dropdownColor: AppThemeDark.primaryBackground,
+                  style: const TextStyle(color: AppThemeDark.textWhite),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: AppThemeDark.primaryBackground,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: AppThemeDark.borderPrimary),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: AppThemeDark.primary,
+                        width: 2,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  items: _categories
+                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                      .toList(),
+                  onChanged: (val) {
+                    if (val != null) setState(() => _category = val);
+                  },
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Payment Method',
+                            style: TextStyle(
+                              color: AppThemeDark.textSecondary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          DropdownButtonFormField<String>(
+                            value: _method,
+                            dropdownColor: AppThemeDark.primaryBackground,
+                            style: const TextStyle(
+                              color: AppThemeDark.textWhite,
+                            ),
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: AppThemeDark.primaryBackground,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: AppThemeDark.borderPrimary,
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: AppThemeDark.primary,
+                                  width: 2,
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            items: _methods
+                                .map(
+                                  (m) => DropdownMenuItem(
+                                    value: m,
+                                    child: Text(m),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (val) {
+                              if (val != null) setState(() => _method = val);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Date',
+                            style: TextStyle(
+                              color: AppThemeDark.textSecondary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          SizedBox(
+                            width: double.infinity,
+                            child: _DateButton(
+                              label: 'Expense date',
+                              date: _date,
+                              onPressed: _pickDate,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          style: TextButton.styleFrom(foregroundColor: AppThemeDark.primary),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _save,
+          style: FilledButton.styleFrom(
+            backgroundColor: AppThemeDark.primary,
+            foregroundColor: AppThemeDark.textPrimary,
+          ),
+          child: const Text(
+            'Add expense',
+            style: TextStyle(color: Colors.black),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// --- Report Dialog ---
 
 class _ReportSettings {
   final DateTime start;

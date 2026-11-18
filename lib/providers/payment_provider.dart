@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../shared/database/db_init.dart'; // Adjust path if needed
+import '../shared/database/db_init.dart';
 
 class MemberPaymentRecord {
   final int paymentId;
@@ -34,6 +34,7 @@ class MemberPaymentRecord {
 }
 
 class GymExpenseRecord {
+  final int id;
   final String description;
   final String category;
   final DateTime date;
@@ -41,17 +42,31 @@ class GymExpenseRecord {
   final String method;
 
   const GymExpenseRecord({
+    required this.id,
     required this.description,
     required this.category,
     required this.date,
     required this.amount,
     required this.method,
   });
+
+  factory GymExpenseRecord.fromMap(dynamic map) {
+    return GymExpenseRecord(
+      id: map['id'] as int,
+      description: map['description'] as String,
+      category: map['category'] as String,
+      date:
+          DateTime.tryParse(map['expense_date'] as String? ?? '') ??
+          DateTime.now(),
+      amount: (map['amount'] as num?)?.toDouble() ?? 0.0,
+      method: (map['method'] as String?) ?? 'Cash',
+    );
+  }
 }
 
 class PaymentsState {
   final List<MemberPaymentRecord> memberPayments;
-  final List<GymExpenseRecord> gymExpenses;
+  final List<dynamic> gymExpenses;
 
   const PaymentsState({
     required this.memberPayments,
@@ -70,9 +85,10 @@ class PaymentsNotifier extends AsyncNotifier<PaymentsState> {
   }
 
   Future<PaymentsState> _fetchPaymentsData() async {
-    final db = await GymDatabase.instance.database;
+    final gymDb = GymDatabase.instance;
+    final db = await gymDb.database;
 
-    final rows = await db.rawQuery('''
+    final paymentRows = await db.rawQuery('''
       SELECT 
         p.pay_id,
         p.amount,
@@ -91,35 +107,11 @@ class PaymentsNotifier extends AsyncNotifier<PaymentsState> {
       ORDER BY p.payment_date DESC, p.pay_id DESC
     ''');
 
-    final memberPayments = rows.map(MemberPaymentRecord.fromMap).toList();
-
-    final gymExpenses = [
-      GymExpenseRecord(
-        description: 'Monthly facility rent',
-        category: 'Facility',
-        date: DateTime(2026, 9, 3),
-        amount: 1200,
-        method: 'Bank transfer',
-      ),
-      GymExpenseRecord(
-        description: 'Cleaning & supplies',
-        category: 'Supplies',
-        date: DateTime(2026, 9, 10),
-        amount: 145,
-        method: 'Card',
-      ),
-      GymExpenseRecord(
-        description: 'Equipment maintenance',
-        category: 'Maintenance',
-        date: DateTime(2026, 9, 21),
-        amount: 320,
-        method: 'Cash',
-      ),
-    ];
+    final expenseRows = await gymDb.getExpenses();
 
     return PaymentsState(
-      memberPayments: memberPayments,
-      gymExpenses: gymExpenses,
+      memberPayments: paymentRows.map(MemberPaymentRecord.fromMap).toList(),
+      gymExpenses: expenseRows.map(GymExpenseRecord.fromMap).toList(),
     );
   }
 
@@ -147,6 +139,35 @@ class PaymentsNotifier extends AsyncNotifier<PaymentsState> {
   Future<void> deletePayment(int paymentId) async {
     final gymDb = GymDatabase.instance;
     await gymDb.deletePayment(paymentId);
+    state = await AsyncValue.guard(() => _fetchPaymentsData());
+  }
+
+  Future<void> addExpense({
+    required String description,
+    required String category,
+    required double amount,
+    required String method,
+    DateTime? date,
+  }) async {
+    final gymDb = GymDatabase.instance;
+    final expenseDate = date ?? DateTime.now();
+    final formattedDate =
+        '${expenseDate.year}-${expenseDate.month.toString().padLeft(2, '0')}-${expenseDate.day.toString().padLeft(2, '0')}';
+
+    await gymDb.insertExpense({
+      'description': description,
+      'category': category,
+      'amount': amount,
+      'expense_date': formattedDate,
+      'method': method,
+    });
+
+    state = await AsyncValue.guard(() => _fetchPaymentsData());
+  }
+
+  Future<void> deleteExpense(int expenseId) async {
+    final gymDb = GymDatabase.instance;
+    await gymDb.deleteExpense(expenseId);
     state = await AsyncValue.guard(() => _fetchPaymentsData());
   }
 }

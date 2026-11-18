@@ -225,6 +225,34 @@ class MembersNotifier extends AsyncNotifier<List<MemberDisplayModel>> {
         where: 'id = ?',
         whereArgs: [subHistoryId],
       );
+
+      final historyRows = await txn.query(
+        'sub_history',
+        columns: ['member_id', 'start_date'],
+        where: 'id = ?',
+        whereArgs: [subHistoryId],
+        limit: 1,
+      );
+      if (historyRows.isNotEmpty) {
+        final memberId = historyRows.first['member_id'] as int;
+        final startDate = historyRows.first['start_date'] as String;
+        final paymentRows = await txn.query(
+          'payments',
+          columns: ['pay_id'],
+          where: 'member_id = ? AND payment_date = ?',
+          whereArgs: [memberId, startDate],
+          orderBy: 'pay_id DESC',
+          limit: 1,
+        );
+        if (paymentRows.isNotEmpty) {
+          await txn.update(
+            'payments',
+            {'amount': price},
+            where: 'pay_id = ?',
+            whereArgs: [paymentRows.first['pay_id']],
+          );
+        }
+      }
     });
 
     state = await AsyncValue.guard(() => _fetchMembersWithSubscriptions());
@@ -240,6 +268,7 @@ class MembersNotifier extends AsyncNotifier<List<MemberDisplayModel>> {
       whereArgs: [subHistoryId],
     );
     state = await AsyncValue.guard(() => _fetchMembersWithSubscriptions());
+    ref.invalidate(paymentsProvider);
   }
 
   Future<void> deleteMember(int memberId) async {

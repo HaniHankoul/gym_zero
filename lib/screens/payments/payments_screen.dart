@@ -45,6 +45,7 @@ class PaymentsScreen extends ConsumerWidget {
                   memberCount: data.memberPayments.length,
                   expenseTotal: data.expenseTotal,
                   expenseCount: data.gymExpenses.length,
+                  totalRevenue: data.memberTotal - data.expenseTotal,
                 ),
                 const SizedBox(height: 32),
                 _SectionTitle(
@@ -206,21 +207,23 @@ class _SummaryRow extends StatelessWidget {
   final int memberCount;
   final double expenseTotal;
   final int expenseCount;
+  final double totalRevenue;
 
   const _SummaryRow({
     required this.memberTotal,
     required this.memberCount,
     required this.expenseTotal,
     required this.expenseCount,
+    required this.totalRevenue,
   });
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = constraints.maxWidth < 650
-            ? constraints.maxWidth
-            : (constraints.maxWidth - 16) / 2;
+        final width = constraints.maxWidth < 1000
+            ? (constraints.maxWidth - 16) / 2
+            : (constraints.maxWidth - 40) / 3;
         return Wrap(
           spacing: 16,
           runSpacing: 16,
@@ -240,6 +243,14 @@ class _SummaryRow extends StatelessWidget {
               detail: '$expenseCount expenses logged',
               icon: Icons.trending_down,
               color: AppThemeDark.warning,
+            ),
+            _SummaryCard(
+              width: width,
+              label: 'total revenue',
+              value: _formatCurrency(totalRevenue),
+              detail: totalRevenue >= 0 ? "Profit" : "Loss",
+              icon: Icons.trending_up,
+              color: totalRevenue >= 0 ? AppThemeDark.success : Colors.red,
             ),
           ],
         );

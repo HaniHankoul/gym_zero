@@ -288,7 +288,7 @@ class _MetricGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const gap = 16.0;
-    final itemWidth = (maxWidth - 60 * (columnCount - 1)) / columnCount;
+    final itemWidth = (maxWidth - 50 * (columnCount - 1)) / columnCount;
 
     return Wrap(
       spacing: gap,
@@ -463,7 +463,7 @@ class _ActivityViewer extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: activities.length,
-      separatorBuilder: (_, __) => Divider(
+      separatorBuilder: (_, _) => Divider(
         color: AppThemeDark.borderPrimary.withValues(alpha: 0.5),
         height: 16,
       ),

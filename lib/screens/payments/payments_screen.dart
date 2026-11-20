@@ -7,6 +7,8 @@ import '../../shared/constants/general_sizes.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/custom_text.dart';
 import '../../shared/widgets/custom_text_field.dart';
+import 'widgets/gym_expenses_log_screen.dart';
+import 'widgets/member_payments_log_screen.dart';
 
 enum _ReportSource { memberPayments, gymExpenses }
 
@@ -31,6 +33,8 @@ class PaymentsScreen extends ConsumerWidget {
           ),
         ),
         data: (data) {
+          final netRevenue = data.memberTotal - data.expenseTotal;
+
           return SingleChildScrollView(
             padding: const EdgeInsets.all(GeneralSizes.largeSize),
             child: Column(
@@ -45,52 +49,99 @@ class PaymentsScreen extends ConsumerWidget {
                   memberCount: data.memberPayments.length,
                   expenseTotal: data.expenseTotal,
                   expenseCount: data.gymExpenses.length,
-                  totalRevenue: data.memberTotal - data.expenseTotal,
+                  totalRevenue: netRevenue,
                 ),
                 const SizedBox(height: 32),
-                _SectionTitle(
-                  title: 'Member Payments',
-                  subtitle:
-                      '${data.memberPayments.length} transactions recorded',
-                  icon: Icons.people_alt_outlined,
-                ),
-                const SizedBox(height: 14),
-                _MemberPaymentsViewer(
-                  payments: data.memberPayments,
-                  onDelete: (id) =>
-                      ref.read(paymentsProvider.notifier).deletePayment(id),
-                ),
-                const SizedBox(height: 32),
-                _SectionTitle(
-                  title: 'Gym Expenses',
-                  subtitle:
-                      '${data.gymExpenses.length} operational costs recorded',
-                  icon: Icons.account_balance_wallet_outlined,
-                  trailing: FilledButton.icon(
-                    onPressed: () => _showAddExpenseDialog(context, ref),
-                    icon: const Icon(Icons.add, size: 18, color: Colors.black),
-                    label: const Text(
-                      'Add expense',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppThemeDark.primary,
-                      foregroundColor: AppThemeDark.textPrimary,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                    ),
+                const Text(
+                  'Transaction Logs',
+                  style: TextStyle(
+                    color: AppThemeDark.textWhite,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 14),
-                _GymExpensesViewer(
-                  expenses: data.gymExpenses,
-                  onDelete: (id) =>
-                      ref.read(paymentsProvider.notifier).deleteExpense(id),
+                const SizedBox(height: 4),
+                const Text(
+                  'Open a full searchable log to browse, filter, or manage records.',
+                  style: TextStyle(
+                    color: AppThemeDark.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isStacked = constraints.maxWidth < 720;
+                    final cardWidth = isStacked
+                        ? constraints.maxWidth
+                        : (constraints.maxWidth - 16) / 2;
+
+                    return Wrap(
+                      spacing: 16,
+                      runSpacing: 16,
+                      children: [
+                        SizedBox(
+                          width: cardWidth,
+                          child: _LogNavigationCard(
+                            title: 'Member Payments',
+                            subtitle: 'View and search all incoming membership transactions.',
+                            countText:
+                                '${data.memberPayments.length}${data.memberPayments.length == 1 ? 'record' : 'records'}',
+                            totalText: '+${_formatCurrency(data.memberTotal)}',
+                            accentColor: AppThemeDark.success,
+                            icon: Icons.people_alt_outlined,
+                            buttonLabel: 'Open Payments Log',
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const MemberPaymentsLogScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        SizedBox(
+                          width: cardWidth,
+                          child: _LogNavigationCard(
+                            title: 'Gym Expenses',
+                            subtitle: 'View, search, and record gym operating expenses.',
+                            countText:
+                                '${data.gymExpenses.length}${data.gymExpenses.length == 1 ? 'record' : 'records'}',
+                            totalText: '-${_formatCurrency(data.expenseTotal)}',
+                            accentColor: AppThemeDark.warning,
+                            icon: Icons.account_balance_wallet_outlined,
+                            buttonLabel: 'Open Expenses Log',
+                            secondaryAction: OutlinedButton.icon(
+                              onPressed: () =>
+                                  showAddExpenseDialog(context, ref),
+                              icon: const Icon(Icons.add, size: 16),
+                              label: const Text('Add expense'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppThemeDark.textWhite,
+                                side: BorderSide(
+                                  color: AppThemeDark.primary.withValues(
+                                    alpha: 0.6,
+                                  ),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 10,
+                                ),
+                              ),
+                            ),
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const GymExpensesLogScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),
@@ -100,27 +151,6 @@ class PaymentsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _showAddExpenseDialog(
-    BuildContext context,
-    WidgetRef ref,
-  ) async {
-    final expenseData = await showDialog<_NewExpenseData>(
-      context: context,
-      builder: (context) => const _AddExpenseDialog(),
-    );
-    if (!context.mounted || expenseData == null) return;
-
-    await ref
-        .read(paymentsProvider.notifier)
-        .addExpense(
-          description: expenseData.description,
-          category: expenseData.category,
-          amount: expenseData.amount,
-          method: expenseData.method,
-          date: expenseData.date,
-        );
-  }
-
   Future<void> _showReportDialog(BuildContext context, WidgetRef ref) async {
     final result = await showDialog<_ReportSettings>(
       context: context,
@@ -128,7 +158,7 @@ class PaymentsScreen extends ConsumerWidget {
     );
     if (!context.mounted || result == null) return;
 
-    final period = '${_formatDate(result.start)} - ${_formatDate(result.end)}';
+    final period = '${_formatDate(result.start)} -${_formatDate(result.end)}';
     final isPayments = result.source == _ReportSource.memberPayments;
     final reportName =
         '${isPayments ? "Payments report" : "Gym expenses report"} - ${_formatDate(result.start)}';
@@ -150,6 +180,25 @@ class PaymentsScreen extends ConsumerWidget {
       );
     }
   }
+}
+
+/// Shared helper so both PaymentsScreen and GymExpensesLogScreen can add expenses.
+Future<void> showAddExpenseDialog(BuildContext context, WidgetRef ref) async {
+  final expenseData = await showDialog<_NewExpenseData>(
+    context: context,
+    builder: (context) => const _AddExpenseDialog(),
+  );
+  if (!context.mounted || expenseData == null) return;
+
+  await ref
+      .read(paymentsProvider.notifier)
+      .addExpense(
+        description: expenseData.description,
+        category: expenseData.category,
+        amount: expenseData.amount,
+        method: expenseData.method,
+        date: expenseData.date,
+      );
 }
 
 class _PaymentsHeader extends StatelessWidget {
@@ -190,7 +239,7 @@ class _PaymentsHeader extends StatelessWidget {
           ),
           label: const Text(
             'Create report',
-            style: TextStyle(color: Colors.black),
+            style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
           ),
           style: FilledButton.styleFrom(
             backgroundColor: AppThemeDark.primary,
@@ -221,9 +270,12 @@ class _SummaryRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = constraints.maxWidth < 1000
+        final width = constraints.maxWidth < 650
+            ? constraints.maxWidth
+            : constraints.maxWidth < 1000
             ? (constraints.maxWidth - 16) / 2
-            : (constraints.maxWidth - 40) / 3;
+            : (constraints.maxWidth - 32) / 3;
+
         return Wrap(
           spacing: 16,
           runSpacing: 16,
@@ -246,11 +298,13 @@ class _SummaryRow extends StatelessWidget {
             ),
             _SummaryCard(
               width: width,
-              label: 'total revenue',
+              label: 'Total Revenue',
               value: _formatCurrency(totalRevenue),
-              detail: totalRevenue >= 0 ? "Profit" : "Loss",
-              icon: Icons.trending_up,
-              color: totalRevenue >= 0 ? AppThemeDark.success : Colors.red,
+              detail: totalRevenue >= 0 ? 'Net Profit' : 'Net Loss',
+              icon: totalRevenue >= 0 ? Icons.trending_up : Icons.trending_down,
+              color: totalRevenue >= 0
+                  ? AppThemeDark.success
+                  : AppThemeDark.error,
             ),
           ],
         );
@@ -296,29 +350,35 @@ class _SummaryCard extends StatelessWidget {
               child: Icon(icon, size: 24),
             ),
             const SizedBox(width: 16),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: AppThemeDark.textSecondary,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppThemeDark.textSecondary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    color: AppThemeDark.textWhite,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
+                  const SizedBox(height: 6),
+                  Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppThemeDark.textWhite,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(detail, style: TextStyle(color: color, fontSize: 12)),
-              ],
+                  const SizedBox(height: 2),
+                  Text(detail, style: TextStyle(color: color, fontSize: 12)),
+                ],
+              ),
             ),
           ],
         ),
@@ -327,306 +387,137 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-class _SectionTitle extends StatelessWidget {
+class _LogNavigationCard extends StatelessWidget {
   final String title;
   final String subtitle;
+  final String countText;
+  final String totalText;
+  final Color accentColor;
   final IconData icon;
-  final Widget? trailing;
+  final String buttonLabel;
+  final Widget? secondaryAction;
+  final VoidCallback onTap;
 
-  const _SectionTitle({
+  const _LogNavigationCard({
     required this.title,
     required this.subtitle,
+    required this.countText,
+    required this.totalText,
+    required this.accentColor,
     required this.icon,
-    this.trailing,
+    required this.buttonLabel,
+    required this.onTap,
+    this.secondaryAction,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, color: AppThemeDark.primary, size: 22),
-        const SizedBox(width: 10),
-        Expanded(
+    return Material(
+      color: AppThemeDark.secondary,
+      borderRadius: BorderRadius.circular(GeneralSizes.borderRadiusM),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(GeneralSizes.borderRadiusM),
+        child: Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(GeneralSizes.borderRadiusM),
+            border: Border.all(color: AppThemeDark.borderPrimary),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: AppThemeDark.textWhite,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                ),
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: accentColor.withValues(alpha: 0.14),
+                    foregroundColor: accentColor,
+                    child: Icon(icon, size: 24),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            color: AppThemeDark.textWhite,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          countText,
+                          style: const TextStyle(
+                            color: AppThemeDark.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    totalText,
+                    style: TextStyle(
+                      color: accentColor,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
+              const SizedBox(height: 14),
               Text(
                 subtitle,
                 style: const TextStyle(
                   color: AppThemeDark.textSecondary,
-                  fontSize: 12,
+                  fontSize: 13,
+                  height: 1.4,
                 ),
+              ),
+              const SizedBox(height: 20),
+              Divider(
+                color: AppThemeDark.borderPrimary.withValues(alpha: 0.6),
+                height: 1,
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  FilledButton.icon(
+                    onPressed: onTap,
+                    icon: const Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 17,
+                      color: Colors.black,
+                    ),
+                    label: Text(
+                      buttonLabel,
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppThemeDark.primary,
+                      foregroundColor: AppThemeDark.textPrimary,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 11,
+                      ),
+                    ),
+                  ),
+                  if (secondaryAction != null) secondaryAction!,
+                ],
               ),
             ],
           ),
-        ),
-        if (trailing != null) trailing!,
-      ],
-    );
-  }
-}
-
-class _MemberPaymentsViewer extends StatelessWidget {
-  final List<MemberPaymentRecord> payments;
-  final ValueChanged<int> onDelete;
-
-  const _MemberPaymentsViewer({required this.payments, required this.onDelete});
-
-  @override
-  Widget build(BuildContext context) {
-    if (payments.isEmpty) {
-      return const _EmptyStateCard(message: 'No member payments recorded yet.');
-    }
-
-    return Container(
-      decoration: BoxDecoration(
-        color: AppThemeDark.secondary,
-        borderRadius: BorderRadius.circular(GeneralSizes.borderRadiusM),
-        border: Border.all(color: AppThemeDark.borderPrimary),
-      ),
-      child: ListView.separated(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: payments.length,
-        separatorBuilder: (_, __) => Divider(
-          color: AppThemeDark.borderPrimary.withValues(alpha: 0.5),
-          height: 1,
-        ),
-        itemBuilder: (context, index) {
-          final payment = payments[index];
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: AppThemeDark.primary.withValues(alpha: 0.12),
-                  child: Icon(
-                    Icons.person,
-                    color: AppThemeDark.primary,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        payment.memberName,
-                        style: const TextStyle(
-                          color: AppThemeDark.textWhite,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        payment.membership,
-                        style: const TextStyle(
-                          color: AppThemeDark.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                _MethodBadge(method: payment.method),
-                const SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '+${_formatCurrency(payment.amount)}',
-                      style: const TextStyle(
-                        color: AppThemeDark.success,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      _formatDate(payment.date),
-                      style: const TextStyle(
-                        color: AppThemeDark.textSecondary,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 10),
-                IconButton(
-                  onPressed: () => onDelete(payment.paymentId),
-                  icon: const Icon(Icons.delete_outline, size: 18),
-                  color: AppThemeDark.textSecondary,
-                  tooltip: 'Delete transaction',
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _GymExpensesViewer extends StatelessWidget {
-  final List<dynamic> expenses;
-  final ValueChanged<int> onDelete;
-
-  const _GymExpensesViewer({required this.expenses, required this.onDelete});
-
-  @override
-  Widget build(BuildContext context) {
-    if (expenses.isEmpty) {
-      return const _EmptyStateCard(message: 'No gym expenses recorded yet.');
-    }
-
-    return Container(
-      decoration: BoxDecoration(
-        color: AppThemeDark.secondary,
-        borderRadius: BorderRadius.circular(GeneralSizes.borderRadiusM),
-        border: Border.all(color: AppThemeDark.borderPrimary),
-      ),
-      child: ListView.separated(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: expenses.length,
-        separatorBuilder: (_, __) => Divider(
-          color: AppThemeDark.borderPrimary.withValues(alpha: 0.5),
-          height: 1,
-        ),
-        itemBuilder: (context, index) {
-          final expense = expenses[index];
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: AppThemeDark.warning.withValues(alpha: 0.12),
-                  child: const Icon(
-                    Icons.shopping_bag_outlined,
-                    color: AppThemeDark.warning,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        expense.description,
-                        style: const TextStyle(
-                          color: AppThemeDark.textWhite,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        expense.category,
-                        style: const TextStyle(
-                          color: AppThemeDark.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                _MethodBadge(method: expense.method),
-                const SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '-${_formatCurrency(expense.amount)}',
-                      style: const TextStyle(
-                        color: AppThemeDark.warning,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      _formatDate(expense.date),
-                      style: const TextStyle(
-                        color: AppThemeDark.textSecondary,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 10),
-                IconButton(
-                  onPressed: () => onDelete(expense.id),
-                  icon: const Icon(Icons.delete_outline, size: 18),
-                  color: AppThemeDark.textSecondary,
-                  tooltip: 'Delete expense',
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _MethodBadge extends StatelessWidget {
-  final String method;
-
-  const _MethodBadge({required this.method});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppThemeDark.primaryBackground,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppThemeDark.borderPrimary),
-      ),
-      child: Text(
-        method,
-        style: const TextStyle(
-          color: AppThemeDark.textSecondary,
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyStateCard extends StatelessWidget {
-  final String message;
-
-  const _EmptyStateCard({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 28),
-      decoration: BoxDecoration(
-        color: AppThemeDark.secondary,
-        borderRadius: BorderRadius.circular(GeneralSizes.borderRadiusM),
-        border: Border.all(color: AppThemeDark.borderPrimary),
-      ),
-      child: Center(
-        child: Text(
-          message,
-          style: const TextStyle(color: AppThemeDark.textSecondary),
         ),
       ),
     );
@@ -722,7 +613,7 @@ class _AddExpenseDialogState extends State<_AddExpenseDialog> {
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: AppThemeDark.borderPrimary),
+        side: const BorderSide(color: AppThemeDark.borderPrimary),
       ),
       title: CustomText(
         text: 'Add Gym Expense',
@@ -785,7 +676,9 @@ class _AddExpenseDialogState extends State<_AddExpenseDialog> {
                       vertical: 12,
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: AppThemeDark.borderPrimary),
+                      borderSide: const BorderSide(
+                        color: AppThemeDark.borderPrimary,
+                      ),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     focusedBorder: OutlineInputBorder(
@@ -833,7 +726,7 @@ class _AddExpenseDialogState extends State<_AddExpenseDialog> {
                                 vertical: 12,
                               ),
                               enabledBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
+                                borderSide: const BorderSide(
                                   color: AppThemeDark.borderPrimary,
                                 ),
                                 borderRadius: BorderRadius.circular(12),
@@ -970,7 +863,7 @@ class _ReportDialogState extends State<_ReportDialog> {
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: AppThemeDark.borderPrimary),
+        side: const BorderSide(color: AppThemeDark.borderPrimary),
       ),
       title: CustomText(
         text: 'Create payment report',
@@ -1078,7 +971,10 @@ class _ReportDialogState extends State<_ReportDialog> {
             backgroundColor: AppThemeDark.primary,
             foregroundColor: AppThemeDark.textPrimary,
           ),
-          child: const Text('Generate report'),
+          child: const Text(
+            'Generate report',
+            style: TextStyle(color: Colors.black),
+          ),
         ),
       ],
     );

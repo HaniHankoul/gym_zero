@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:open_filex/open_filex.dart';
 
 import '../../providers/payment_provider.dart';
 import '../../providers/reports_provider.dart';
 import '../../shared/constants/general_sizes.dart';
+import '../../shared/services/excel_report_service.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/custom_text.dart';
 import '../../shared/widgets/custom_text_field.dart';
@@ -86,7 +88,7 @@ class PaymentsScreen extends ConsumerWidget {
                             title: 'Member Payments',
                             subtitle: 'View and search all incoming membership transactions.',
                             countText:
-                                '${data.memberPayments.length}${data.memberPayments.length == 1 ? 'record' : 'records'}',
+                                '${data.memberPayments.length} ${data.memberPayments.length == 1 ? 'record' : 'records'}',
                             totalText: '+${_formatCurrency(data.memberTotal)}',
                             accentColor: AppThemeDark.success,
                             icon: Icons.people_alt_outlined,
@@ -107,7 +109,7 @@ class PaymentsScreen extends ConsumerWidget {
                             title: 'Gym Expenses',
                             subtitle: 'View, search, and record gym operating expenses.',
                             countText:
-                                '${data.gymExpenses.length}${data.gymExpenses.length == 1 ? 'record' : 'records'}',
+                                '${data.gymExpenses.length} ${data.gymExpenses.length == 1 ? 'record' : 'records'}',
                             totalText: '-${_formatCurrency(data.expenseTotal)}',
                             accentColor: AppThemeDark.warning,
                             icon: Icons.account_balance_wallet_outlined,
@@ -158,26 +160,62 @@ class PaymentsScreen extends ConsumerWidget {
     );
     if (!context.mounted || result == null) return;
 
-    final period = '${_formatDate(result.start)} -${_formatDate(result.end)}';
+    final paymentsData = ref.read(paymentsProvider).value;
+    if (paymentsData == null) return;
+
     final isPayments = result.source == _ReportSource.memberPayments;
-    final reportName =
-        '${isPayments ? "Payments report" : "Gym expenses report"} - ${_formatDate(result.start)}';
 
-    await ref
-        .read(reportsProvider.notifier)
-        .addReport(
-          name: reportName,
-          type: ReportType.payments,
-          period: period,
-          format: 'PDF',
-        );
-
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$reportName created and saved to Reports history.'),
-        ),
+    try {
+      final generated = await ExcelReportService.generatePaymentsExcelReport(
+        source: isPayments
+            ? ExcelReportSource.memberPayments
+            : ExcelReportSource.gymExpenses,
+        startDate: result.start,
+        endDate: result.end,
+        allMemberPayments: paymentsData.memberPayments,
+        allGymExpenses: paymentsData.gymExpenses,
+        includeSubscriptionHistory: isPayments && result.includeHistory,
       );
+
+      final period =
+          '${_formatDate(result.start)} - ${_formatDate(result.end)}';
+      final reportName =
+          '${isPayments ? "Payments report" : "Gym expenses report"} - ${_formatDate(result.start)}';
+
+      await ref
+          .read(reportsProvider.notifier)
+          .addReport(
+            name: reportName,
+            type: ReportType.payments,
+            period: period,
+            format: 'XLSX',
+            filePath: generated.filePath,
+          );
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            duration: const Duration(seconds: 6),
+            content: Text(
+              'Excel saved (${generated.recordCount} rows): ${generated.fileName}',
+            ),
+            action: SnackBarAction(
+              label: 'Open',
+              textColor: AppThemeDark.primary,
+              onPressed: () => OpenFilex.open(generated.filePath),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppThemeDark.error,
+            content: Text('Failed to generate Excel report: $e'),
+          ),
+        );
+      }
     }
   }
 }
@@ -832,10 +870,18 @@ class _ReportDialog extends StatefulWidget {
 }
 
 class _ReportDialogState extends State<_ReportDialog> {
-  DateTime _start = DateTime(2026, 9, 1);
-  DateTime _end = DateTime(2026, 9, 30);
+  late DateTime _start;
+  late DateTime _end;
   _ReportSource _source = _ReportSource.memberPayments;
   bool _includeHistory = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _start = DateTime(now.year, now.month, 1);
+    _end = now;
+  }
 
   Future<void> _pickDate({required bool start}) async {
     final picked = await showDatePicker(
@@ -866,7 +912,7 @@ class _ReportDialogState extends State<_ReportDialog> {
         side: const BorderSide(color: AppThemeDark.borderPrimary),
       ),
       title: CustomText(
-        text: 'Create payment report',
+        text: 'Create Excel report',
         fontSize: 22,
         fontWeight: FontWeight.w700,
       ),
@@ -936,18 +982,19 @@ class _ReportDialogState extends State<_ReportDialog> {
                 setState(() => _source = selection.first);
               },
             ),
-            CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              activeColor: AppThemeDark.primary,
-              checkColor: AppThemeDark.textPrimary,
-              title: const Text(
-                'Show member subscription history',
-                style: TextStyle(color: AppThemeDark.textWhite),
+            if (_source == _ReportSource.memberPayments)
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                activeColor: AppThemeDark.primary,
+                checkColor: AppThemeDark.textPrimary,
+                title: const Text(
+                  'Show member subscription history',
+                  style: TextStyle(color: AppThemeDark.textWhite),
+                ),
+                value: _includeHistory,
+                onChanged: (value) =>
+                    setState(() => _includeHistory = value ?? false),
               ),
-              value: _includeHistory,
-              onChanged: (value) =>
-                  setState(() => _includeHistory = value ?? false),
-            ),
           ],
         ),
       ),
@@ -972,8 +1019,8 @@ class _ReportDialogState extends State<_ReportDialog> {
             foregroundColor: AppThemeDark.textPrimary,
           ),
           child: const Text(
-            'Generate report',
-            style: TextStyle(color: Colors.black),
+            'Export Excel',
+            style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
           ),
         ),
       ],

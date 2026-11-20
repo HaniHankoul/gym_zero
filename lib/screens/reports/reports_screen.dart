@@ -154,7 +154,7 @@ class _PageHeader extends StatelessWidget {
 }
 
 class _SummaryRow extends StatelessWidget {
-  final List<ReportRecord> reports;
+  final List<dynamic> reports;
 
   const _SummaryRow({required this.reports});
 
@@ -312,7 +312,7 @@ class _FilterMenu extends StatelessWidget {
 }
 
 class _ReportsTable extends StatelessWidget {
-  final List<ReportRecord> reports;
+  final List<dynamic> reports;
   final ValueChanged<ReportRecord> onDownload;
   final ValueChanged<int> onDelete;
 

@@ -11,7 +11,7 @@ class GymDatabase {
   static final GymDatabase instance = GymDatabase._();
 
   static const _databaseName = 'gym_zero.db';
-  static const _databaseVersion = 3; // Incremented for expenses table
+  static const _databaseVersion = 4;
 
   Database? _database;
 
@@ -43,7 +43,8 @@ class GymDatabase {
               created_at TEXT NOT NULL,
               period TEXT NOT NULL,
               format TEXT NOT NULL,
-              status TEXT NOT NULL
+              status TEXT NOT NULL,
+              file_path TEXT
             )
           ''');
         }
@@ -58,6 +59,9 @@ class GymDatabase {
               method TEXT NOT NULL
             )
           ''');
+        }
+        if (oldVersion >= 2 && oldVersion < 4) {
+          await db.execute('ALTER TABLE reports ADD COLUMN file_path TEXT');
         }
       },
     );
@@ -151,7 +155,8 @@ class GymDatabase {
           created_at TEXT NOT NULL,
           period TEXT NOT NULL,
           format TEXT NOT NULL,
-          status TEXT NOT NULL
+          status TEXT NOT NULL,
+          file_path TEXT
         )
       ''');
 
@@ -171,44 +176,6 @@ class GymDatabase {
         'CREATE INDEX idx_sub_history_sub ON sub_history (sub_id)',
       );
     });
-  }
-
-  // Expenses
-  Future<int> insertExpense(Map<String, Object?> expense) async {
-    return (await database).insert('expenses', expense);
-  }
-
-  Future<List> getExpenses() async {
-    return (await database).query(
-      'expenses',
-      orderBy: 'expense_date DESC, id DESC',
-    );
-  }
-
-  Future<int> deleteExpense(int id) async {
-    return (await database).delete(
-      'expenses',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-  }
-
-  // Reports
-  Future<int> insertReport(Map<String, Object?> report) async {
-    return (await database).insert('reports', report);
-  }
-
-  Future<List> getReports({String? type}) async {
-    return (await database).query(
-      'reports',
-      where: type == null ? null : 'type = ?',
-      whereArgs: type == null ? null : [type],
-      orderBy: 'created_at DESC, id DESC',
-    );
-  }
-
-  Future<int> deleteReport(int id) async {
-    return (await database).delete('reports', where: 'id = ?', whereArgs: [id]);
   }
 
   // Users
@@ -360,6 +327,45 @@ class GymDatabase {
     );
   }
 
+  // Expenses
+  Future<int> insertExpense(Map<String, Object?> expense) async {
+    return (await database).insert('expenses', expense);
+  }
+
+  Future<List> getExpenses() async {
+    return (await database).query(
+      'expenses',
+      orderBy: 'expense_date DESC, id DESC',
+    );
+  }
+
+  Future? getExpense(int id) async {
+    final rows = await (await database).query(
+      'expenses',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  Future<int> updateExpense(int id, Map<String, Object?> values) async {
+    return (await database).update(
+      'expenses',
+      values,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<int> deleteExpense(int id) async {
+    return (await database).delete(
+      'expenses',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   // Attendance
   Future<int> insertAttendance(Map<String, Object?> attendance) async {
     return (await database).insert('attendance', attendance);
@@ -446,6 +452,34 @@ class GymDatabase {
       where: 'id = ?',
       whereArgs: [historyId],
     );
+  }
+
+  // Reports
+  Future<int> insertReport(Map<String, Object?> report) async {
+    return (await database).insert('reports', report);
+  }
+
+  Future<List> getReports({String? type}) async {
+    return (await database).query(
+      'reports',
+      where: type == null ? null : 'type = ?',
+      whereArgs: type == null ? null : [type],
+      orderBy: 'created_at DESC, id DESC',
+    );
+  }
+
+  Future? getReport(int id) async {
+    final rows = await (await database).query(
+      'reports',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  Future<int> deleteReport(int id) async {
+    return (await database).delete('reports', where: 'id = ?', whereArgs: [id]);
   }
 
   Future<void> close() async {

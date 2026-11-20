@@ -13,6 +13,7 @@ class ReportRecord {
   final String period;
   final String format;
   final String status;
+  final String? filePath;
 
   const ReportRecord({
     required this.id,
@@ -22,6 +23,7 @@ class ReportRecord {
     required this.period,
     required this.format,
     required this.status,
+    this.filePath,
   });
 
   factory ReportRecord.fromMap(dynamic map) {
@@ -39,6 +41,7 @@ class ReportRecord {
       period: map['period'] as String,
       format: map['format'] as String,
       status: map['status'] as String,
+      filePath: map['file_path'] as String?,
     );
   }
 
@@ -50,19 +53,20 @@ class ReportRecord {
       'period': period,
       'format': format,
       'status': status,
+      'file_path': filePath,
     };
   }
 }
 
 final reportFilterProvider = StateProvider<ReportType?>((ref) => null);
 
-class ReportsNotifier extends AsyncNotifier<List<ReportRecord>> {
+class ReportsNotifier extends AsyncNotifier<List<dynamic>> {
   @override
-  Future<List<ReportRecord>> build() async {
+  Future<List<dynamic>> build() async {
     return _fetchReports();
   }
 
-  Future<List<ReportRecord>> _fetchReports() async {
+  Future<List<dynamic>> _fetchReports() async {
     final db = GymDatabase.instance;
     final rows = await db.getReports();
     return rows.map(ReportRecord.fromMap).toList();
@@ -74,6 +78,7 @@ class ReportsNotifier extends AsyncNotifier<List<ReportRecord>> {
     required String period,
     required String format,
     String status = 'Ready',
+    String? filePath,
   }) async {
     final db = GymDatabase.instance;
     await db.insertReport({
@@ -83,6 +88,7 @@ class ReportsNotifier extends AsyncNotifier<List<ReportRecord>> {
       'period': period,
       'format': format,
       'status': status,
+      'file_path': filePath,
     });
     state = await AsyncValue.guard(() => _fetchReports());
   }
@@ -94,12 +100,11 @@ class ReportsNotifier extends AsyncNotifier<List<ReportRecord>> {
   }
 }
 
-final reportsProvider =
-    AsyncNotifierProvider<ReportsNotifier, List<ReportRecord>>(
-      () => ReportsNotifier(),
-    );
+final reportsProvider = AsyncNotifierProvider<ReportsNotifier, List<dynamic>>(
+  () => ReportsNotifier(),
+);
 
-final filteredReportsProvider = Provider<AsyncValue<List<ReportRecord>>>((ref) {
+final filteredReportsProvider = Provider<AsyncValue<List<dynamic>>>((ref) {
   final filter = ref.watch(reportFilterProvider);
   final reportsAsync = ref.watch(reportsProvider);
 

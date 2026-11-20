@@ -29,7 +29,7 @@ class ExcelReportService {
     required DateTime startDate,
     required DateTime endDate,
     required List<MemberPaymentRecord> allMemberPayments,
-    required List<GymExpenseRecord> allGymExpenses,
+    required List<dynamic> allGymExpenses,
     bool includeSubscriptionHistory = false,
   }) async {
     final start = DateTime(startDate.year, startDate.month, startDate.day);
@@ -184,7 +184,7 @@ class ExcelReportService {
 
   static void _buildGymExpensesSheet({
     required Sheet sheet,
-    required List<GymExpenseRecord> expenses,
+    required List<dynamic> expenses,
     required String periodLabel,
   }) {
     const headers = [

@@ -38,7 +38,7 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
     );
     if (!mounted || payload == null) return;
 
-    await ref
+    final added = await ref
         .read(membersProvider.notifier)
         .addMemberWithSubscription(
           name: payload.name,
@@ -46,6 +46,17 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
           durationMonths: payload.durationMonths,
           price: payload.price,
         );
+
+    if (!mounted) return;
+
+    if (!added) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppThemeDark.error,
+          content: Text('Member "${payload.name}" already exists.'),
+        ),
+      );
+    }
   }
 
   void _showMemberDetails(MemberDisplayModel member) {

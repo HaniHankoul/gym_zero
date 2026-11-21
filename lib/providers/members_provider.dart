@@ -86,13 +86,32 @@ class MembersNotifier extends AsyncNotifier<List<MemberDisplayModel>> {
     return rows.map(MemberDisplayModel.fromMap).toList();
   }
 
-  Future<void> addMemberWithSubscription({
+  Future<bool> memberNameExists(String name) async {
+    final db = await ref.read(gymDatabaseProvider).database;
+    final normalized = name.trim().toLowerCase();
+
+    final rows = await db.query(
+      'members',
+      columns: ['member_id'],
+      where: 'LOWER(TRIM(name)) = ?',
+      whereArgs: [normalized],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+
+  Future<bool> addMemberWithSubscription({
     required String name,
     required int age,
     int? durationMonths,
     double? price,
     int createdByUserId = 1,
   }) async {
+    final trimmedName = name.trim();
+    if (await memberNameExists(trimmedName)) {
+      return false;
+    }
+
     final db = await ref.read(gymDatabaseProvider).database;
 
     await db.transaction((txn) async {
@@ -110,7 +129,7 @@ class MembersNotifier extends AsyncNotifier<List<MemberDisplayModel>> {
       }
 
       final memberId = await txn.insert('members', {
-        'name': name,
+        'name': trimmedName,
         'age': age,
         'created_by_user_id': createdByUserId,
       });
@@ -151,6 +170,7 @@ class MembersNotifier extends AsyncNotifier<List<MemberDisplayModel>> {
 
     state = await AsyncValue.guard(() => _fetchMembersWithSubscriptions());
     ref.invalidate(paymentsProvider);
+    return true;
   }
 
   Future<void> addOrRenewSubscription({

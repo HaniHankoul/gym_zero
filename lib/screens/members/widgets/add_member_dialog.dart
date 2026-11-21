@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gym_zero/shared/widgets/custom_text.dart';
 
+import '../../../providers/members_provider.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../../../shared/widgets/custom_text_field.dart';
 
@@ -18,14 +20,14 @@ class NewMemberPayload {
   });
 }
 
-class AddMemberDialog extends StatefulWidget {
+class AddMemberDialog extends ConsumerStatefulWidget {
   const AddMemberDialog({super.key});
 
   @override
-  State<AddMemberDialog> createState() => _AddMemberDialogState();
+  ConsumerState<AddMemberDialog> createState() => _AddMemberDialogState();
 }
 
-class _AddMemberDialogState extends State<AddMemberDialog> {
+class _AddMemberDialogState extends ConsumerState<AddMemberDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _ageController = TextEditingController();
@@ -60,6 +62,21 @@ class _AddMemberDialogState extends State<AddMemberDialog> {
         price: price,
       ),
     );
+  }
+
+  String? _validateName(String? value) {
+    final trimmed = value?.trim() ?? '';
+    if (trimmed.isEmpty) return 'Enter a name';
+
+    final existingMembers = ref.read(membersProvider).value ?? [];
+    final alreadyExists = existingMembers.any(
+      (m) => m.name.trim().toLowerCase() == trimmed.toLowerCase(),
+    );
+
+    if (alreadyExists) {
+      return 'A member with this name already exists';
+    }
+    return null;
   }
 
   String? _validateDuration(String? value) {
@@ -106,9 +123,7 @@ class _AddMemberDialogState extends State<AddMemberDialog> {
                   controller: _nameController,
                   autofocus: true,
                   hintText: 'Name',
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Enter a name'
-                      : null,
+                  validator: _validateName,
                 ),
                 const SizedBox(height: 12),
                 CustomTextField(

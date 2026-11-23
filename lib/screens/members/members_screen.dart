@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hugeicons/hugeicons.dart';
 
+import '../../providers/members_provider.dart';
 import '../../shared/constants/general_sizes.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/custom_text.dart';
 import '../../shared/widgets/custom_text_field.dart';
-import '../../providers/members_provider.dart';
 import 'widgets/add_member_dialog.dart';
 
 class MembersScreen extends ConsumerStatefulWidget {
@@ -68,14 +68,27 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
     );
   }
 
+  void _clearFilters() {
+    _searchController.clear();
+    ref.read(memberSearchQueryProvider.notifier).state = '';
+    ref.read(memberStatusFilterProvider.notifier).state =
+        MemberStatusFilter.all;
+  }
+
   @override
   Widget build(BuildContext context) {
     final filteredMembersAsync = ref.watch(filteredMembersProvider);
+    final selectedStatus = ref.watch(memberStatusFilterProvider);
+    final searchQuery = ref.watch(memberSearchQueryProvider);
+    final hasActiveFilters =
+        searchQuery.isNotEmpty || selectedStatus != MemberStatusFilter.all;
 
     return Container(
       color: AppThemeDark.primaryBackground,
       child: LayoutBuilder(
         builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 600;
+
           return SingleChildScrollView(
             padding: const EdgeInsets.all(GeneralSizes.largeSize),
             child: Column(
@@ -86,22 +99,48 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
                   onAddMember: _showAddMemberDialog,
                 ),
                 const SizedBox(height: 24),
-                // Search bar only: No toolbar buttons
-                SizedBox(
-                  width: constraints.maxWidth < 600 ? double.infinity : 360,
-                  child: CustomTextField(
-                    controller: _searchController,
-                    onFieldSubmitted: (value) {
-                      ref.read(memberSearchQueryProvider.notifier).state = value
-                          .trim();
-                    },
-                    hintText: 'Search by member name...',
-                    icon: HugeIcons.strokeRoundedSearch02,
-                    prefixCallBack: () {
-                      _searchController.clear();
-                      ref.read(memberSearchQueryProvider.notifier).state = '';
-                    },
-                  ),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: isCompact ? double.infinity : 340,
+                      child: CustomTextField(
+                        controller: _searchController,
+                        onFieldSubmitted: (value) {
+                          ref.read(memberSearchQueryProvider.notifier).state =
+                              value.trim();
+                        },
+                        hintText: 'Search by member name...',
+                        icon: HugeIcons.strokeRoundedSearch02,
+                        prefixCallBack: () {
+                          _searchController.clear();
+                          ref.read(memberSearchQueryProvider.notifier).state =
+                              '';
+                        },
+                      ),
+                    ),
+                    SizedBox(
+                      width: isCompact ? double.infinity : 200,
+                      child: _StatusFilterDropdown(
+                        selected: selectedStatus,
+                        onChanged: (value) {
+                          ref.read(memberStatusFilterProvider.notifier).state =
+                              value;
+                        },
+                      ),
+                    ),
+                    if (hasActiveFilters)
+                      TextButton.icon(
+                        onPressed: _clearFilters,
+                        icon: const Icon(Icons.close, size: 16),
+                        label: const Text('Clear'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppThemeDark.textSecondary,
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 20),
                 filteredMembersAsync.when(
@@ -142,13 +181,30 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
                               ),
                             ),
                             const SizedBox(height: 12),
-                            const Text(
-                              'No members found',
-                              style: TextStyle(
+                            Text(
+                              hasActiveFilters
+                                  ? 'No members match the selected filter'
+                                  : 'No members found',
+                              style: const TextStyle(
                                 color: AppThemeDark.textSecondary,
                                 fontSize: 16,
                               ),
                             ),
+                            if (hasActiveFilters) ...[
+                              const SizedBox(height: 12),
+                              OutlinedButton(
+                                onPressed: _clearFilters,
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppThemeDark.primary,
+                                  side: BorderSide(
+                                    color: AppThemeDark.primary.withValues(
+                                      alpha: 0.5,
+                                    ),
+                                  ),
+                                ),
+                                child: const Text('Reset filters'),
+                              ),
+                            ],
                           ],
                         ),
                       );
@@ -164,6 +220,88 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _StatusFilterDropdown extends StatelessWidget {
+  final MemberStatusFilter selected;
+  final ValueChanged<MemberStatusFilter> onChanged;
+
+  const _StatusFilterDropdown({
+    required this.selected,
+    required this.onChanged,
+  });
+
+  Color _dotColor(MemberStatusFilter filter) {
+    return switch (filter) {
+      MemberStatusFilter.all => AppThemeDark.primary,
+      MemberStatusFilter.active => AppThemeDark.success,
+      MemberStatusFilter.cancelled => AppThemeDark.warning,
+      MemberStatusFilter.expired => AppThemeDark.error,
+      MemberStatusFilter.inactive => AppThemeDark.textSecondary,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 52,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: AppThemeDark.secondary,
+        borderRadius: BorderRadius.circular(GeneralSizes.borderRadiusM),
+        border: Border.all(
+          color: selected == MemberStatusFilter.all
+              ? AppThemeDark.borderPrimary
+              : AppThemeDark.primary.withValues(alpha: 0.7),
+        ),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<MemberStatusFilter>(
+          value: selected,
+          isExpanded: true,
+          dropdownColor: AppThemeDark.secondary,
+          borderRadius: BorderRadius.circular(12),
+          icon: const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: AppThemeDark.textSecondary,
+          ),
+          style: const TextStyle(
+            color: AppThemeDark.textWhite,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+          items: [
+            for (final filter in MemberStatusFilter.values)
+              DropdownMenuItem<MemberStatusFilter>(
+                value: filter,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: _dotColor(filter),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        filter.label,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+          onChanged: (value) {
+            if (value != null) onChanged(value);
+          },
+        ),
       ),
     );
   }
@@ -399,7 +537,6 @@ class _MemberDetailsSheet extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 20),
-              // Header
               Row(
                 children: [
                   CircleAvatar(
@@ -448,7 +585,6 @@ class _MemberDetailsSheet extends ConsumerWidget {
               const SizedBox(height: 24),
               const Divider(color: AppThemeDark.borderPrimary),
               const SizedBox(height: 16),
-              // Subscription details info
               const Text(
                 'Subscription Information',
                 style: TextStyle(
@@ -468,7 +604,6 @@ class _MemberDetailsSheet extends ConsumerWidget {
               _DetailRow(label: 'Expiry Date', value: member.expiryDate),
               _DetailRow(label: 'Status', value: member.status),
               const SizedBox(height: 28),
-              // Action Buttons
               const Text(
                 'Actions',
                 style: TextStyle(
@@ -791,6 +926,8 @@ class _StatusBadge extends StatelessWidget {
         ? AppThemeDark.success
         : lower == 'cancelled'
         ? AppThemeDark.warning
+        : lower == 'inactive'
+        ? AppThemeDark.textSecondary
         : AppThemeDark.error;
 
     return Container(

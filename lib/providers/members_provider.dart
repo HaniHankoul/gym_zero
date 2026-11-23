@@ -5,6 +5,17 @@ import 'package:sqflite/sqflite.dart';
 import '../shared/database/db_init.dart';
 import 'payment_provider.dart';
 
+enum MemberStatusFilter {
+  all('All statuses'),
+  active('Active'),
+  expired('Expired'),
+  cancelled('Cancelled'),
+  inactive('Inactive');
+
+  final String label;
+  const MemberStatusFilter(this.label);
+}
+
 class MemberDisplayModel {
   final int id;
   final String name;
@@ -31,13 +42,25 @@ class MemberDisplayModel {
   bool get hasActiveSubscription => status.toLowerCase() == 'active';
 
   factory MemberDisplayModel.fromMap(Map<String, Object?> map) {
+    final expiryDate = (map['end_date'] as String?) ?? '-';
+    var status = (map['status'] as String?) ?? 'Inactive';
+
+    if (status.toLowerCase() == 'active') {
+      final parsedExpiry = DateTime.tryParse(expiryDate);
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      if (parsedExpiry != null && parsedExpiry.isBefore(today)) {
+        status = 'Expired';
+      }
+    }
+
     return MemberDisplayModel(
       id: map['member_id'] as int,
       name: map['name'] as String,
       age: map['age'] as int,
       membership: (map['sub_name'] as String?) ?? 'No membership',
-      status: (map['status'] as String?) ?? 'Inactive',
-      expiryDate: (map['end_date'] as String?) ?? '-',
+      status: status,
+      expiryDate: expiryDate,
       price: map['price'] != null ? (map['price'] as num).toDouble() : null,
       subId: map['sub_id'] as int?,
       subHistoryId: map['sub_history_id'] as int?,
@@ -53,6 +76,11 @@ final memberSearchQueryProvider = StateProvider.autoDispose<String>(
   (ref) => '',
 );
 
+final memberStatusFilterProvider =
+    StateProvider.autoDispose<MemberStatusFilter>(
+      (ref) => MemberStatusFilter.all,
+    );
+
 class MembersNotifier extends AsyncNotifier<List<MemberDisplayModel>> {
   @override
   Future<List<MemberDisplayModel>> build() async {
@@ -63,7 +91,7 @@ class MembersNotifier extends AsyncNotifier<List<MemberDisplayModel>> {
     final db = await ref.read(gymDatabaseProvider).database;
 
     final rows = await db.rawQuery('''
-      SELECT 
+      SELECT
         m.member_id,
         m.name,
         m.age,
@@ -145,11 +173,9 @@ class MembersNotifier extends AsyncNotifier<List<MemberDisplayModel>> {
         });
 
         final now = DateTime.now();
-        final startDate =
-            '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+        final startDate = _formatIsoDate(now);
         final expiry = DateTime(now.year, now.month + durationMonths, now.day);
-        final endDate =
-            '${expiry.year}-${expiry.month.toString().padLeft(2, '0')}-${expiry.day.toString().padLeft(2, '0')}';
+        final endDate = _formatIsoDate(expiry);
 
         await txn.insert('sub_history', {
           'start_date': startDate,
@@ -181,21 +207,18 @@ class MembersNotifier extends AsyncNotifier<List<MemberDisplayModel>> {
     final db = await ref.read(gymDatabaseProvider).database;
 
     await db.transaction((txn) async {
-      final subCost = price;
       final subName = '$durationMonths Months Plan';
 
       final subId = await txn.insert('subs', {
         'name': subName,
         'duration_months': durationMonths,
-        'price': subCost,
+        'price': price,
       });
 
       final now = DateTime.now();
-      final startDate =
-          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final startDate = _formatIsoDate(now);
       final expiry = DateTime(now.year, now.month + durationMonths, now.day);
-      final endDate =
-          '${expiry.year}-${expiry.month.toString().padLeft(2, '0')}-${expiry.day.toString().padLeft(2, '0')}';
+      final endDate = _formatIsoDate(expiry);
 
       await txn.insert('sub_history', {
         'start_date': startDate,
@@ -206,7 +229,7 @@ class MembersNotifier extends AsyncNotifier<List<MemberDisplayModel>> {
       });
 
       await txn.insert('payments', {
-        'amount': subCost,
+        'amount': price,
         'payment_date': startDate,
         'method': 'Cash',
         'member_id': memberId,
@@ -236,8 +259,7 @@ class MembersNotifier extends AsyncNotifier<List<MemberDisplayModel>> {
 
       final now = DateTime.now();
       final expiry = DateTime(now.year, now.month + durationMonths, now.day);
-      final endDate =
-          '${expiry.year}-${expiry.month.toString().padLeft(2, '0')}-${expiry.day.toString().padLeft(2, '0')}';
+      final endDate = _formatIsoDate(expiry);
 
       await txn.update(
         'sub_history',
@@ -245,34 +267,6 @@ class MembersNotifier extends AsyncNotifier<List<MemberDisplayModel>> {
         where: 'id = ?',
         whereArgs: [subHistoryId],
       );
-
-      final historyRows = await txn.query(
-        'sub_history',
-        columns: ['member_id', 'start_date'],
-        where: 'id = ?',
-        whereArgs: [subHistoryId],
-        limit: 1,
-      );
-      if (historyRows.isNotEmpty) {
-        final memberId = historyRows.first['member_id'] as int;
-        final startDate = historyRows.first['start_date'] as String;
-        final paymentRows = await txn.query(
-          'payments',
-          columns: ['pay_id'],
-          where: 'member_id = ? AND payment_date = ?',
-          whereArgs: [memberId, startDate],
-          orderBy: 'pay_id DESC',
-          limit: 1,
-        );
-        if (paymentRows.isNotEmpty) {
-          await txn.update(
-            'payments',
-            {'amount': price},
-            where: 'pay_id = ?',
-            whereArgs: [paymentRows.first['pay_id']],
-          );
-        }
-      }
     });
 
     state = await AsyncValue.guard(() => _fetchMembersWithSubscriptions());
@@ -288,7 +282,6 @@ class MembersNotifier extends AsyncNotifier<List<MemberDisplayModel>> {
       whereArgs: [subHistoryId],
     );
     state = await AsyncValue.guard(() => _fetchMembersWithSubscriptions());
-    ref.invalidate(paymentsProvider);
   }
 
   Future<void> deleteMember(int memberId) async {
@@ -297,6 +290,9 @@ class MembersNotifier extends AsyncNotifier<List<MemberDisplayModel>> {
     state = await AsyncValue.guard(() => _fetchMembersWithSubscriptions());
     ref.invalidate(paymentsProvider);
   }
+
+  String _formatIsoDate(DateTime date) =>
+      '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 }
 
 final membersProvider =
@@ -307,12 +303,17 @@ final membersProvider =
 final filteredMembersProvider =
     Provider.autoDispose<AsyncValue<List<MemberDisplayModel>>>((ref) {
       final query = ref.watch(memberSearchQueryProvider).toLowerCase();
+      final statusFilter = ref.watch(memberStatusFilterProvider);
       final membersAsync = ref.watch(membersProvider);
 
       return membersAsync.whenData((members) {
-        if (query.isEmpty) return members;
-        return members
-            .where((m) => m.name.toLowerCase().contains(query))
-            .toList();
+        return members.where((member) {
+          final matchesQuery =
+              query.isEmpty || member.name.toLowerCase().contains(query);
+          if (!matchesQuery) return false;
+
+          if (statusFilter == MemberStatusFilter.all) return true;
+          return member.status.toLowerCase() == statusFilter.name;
+        }).toList();
       });
     });

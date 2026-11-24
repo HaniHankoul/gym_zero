@@ -218,7 +218,7 @@ class _GymExpensesLogScreenState extends ConsumerState<GymExpensesLogScreen> {
                           ),
                           child: ListView.separated(
                             itemCount: filtered.length,
-                            separatorBuilder: (_, __) => Divider(
+                            separatorBuilder: (_, _) => Divider(
                               color: AppThemeDark.borderPrimary.withValues(
                                 alpha: 0.5,
                               ),

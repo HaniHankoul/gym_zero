@@ -429,7 +429,7 @@ class _StaffScreenState extends State<StaffScreen> {
                     ),
                     const SizedBox(height: 6),
                     DropdownButtonFormField<_StaffRole>(
-                      value: selectedRole,
+                      initialValue: selectedRole,
                       dropdownColor: AppThemeDark.primaryBackground,
                       style: const TextStyle(color: AppThemeDark.textWhite),
                       decoration: InputDecoration(
@@ -1553,7 +1553,7 @@ class _StaffDetailsSheet extends StatelessWidget {
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: staff.attendanceLog.length,
-                      separatorBuilder: (_, __) => Divider(
+                      separatorBuilder: (_, _) => Divider(
                         color: AppThemeDark.borderPrimary.withValues(
                           alpha: 0.5,
                         ),
@@ -1769,7 +1769,7 @@ class _ReceptionistDetailsSheet extends StatelessWidget {
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: account.members.length,
-                      separatorBuilder: (_, __) => Divider(
+                      separatorBuilder: (_, _) => Divider(
                         color: AppThemeDark.borderPrimary.withValues(
                           alpha: 0.5,
                         ),

@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:gym_zero/screens/home/home_body.dart';
-import 'package:gym_zero/screens/payments/payments_screen.dart';
-import 'package:gym_zero/screens/home/widgets/login_content.dart';
-import 'package:gym_zero/shared/constants/general_sizes.dart';
-import 'package:gym_zero/shared/widgets/navigation/navigaiton_panel.dart';
 
 import '../providers/navigation_provider.dart';
+import '../shared/constants/general_sizes.dart';
 import '../shared/theme/app_theme.dart';
+import '../shared/widgets/navigation/navigaiton_panel.dart';
+import 'home/home_body.dart';
+import 'home/widgets/login_content.dart';
 import 'members/members_screen.dart';
+import 'payments/payments_screen.dart';
 import 'reports/reports_screen.dart';
 import 'staff/staff_screen.dart';
 

@@ -551,7 +551,7 @@ class _LogNavigationCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (secondaryAction != null) secondaryAction!,
+                  ?secondaryAction,
                 ],
               ),
             ],
@@ -703,7 +703,7 @@ class _AddExpenseDialogState extends State<_AddExpenseDialog> {
                 ),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
-                  value: _category,
+                  initialValue: _category,
                   dropdownColor: AppThemeDark.primaryBackground,
                   style: const TextStyle(color: AppThemeDark.textWhite),
                   decoration: InputDecoration(
@@ -751,7 +751,7 @@ class _AddExpenseDialogState extends State<_AddExpenseDialog> {
                           ),
                           const SizedBox(height: 6),
                           DropdownButtonFormField<String>(
-                            value: _method,
+                            initialValue: _method,
                             dropdownColor: AppThemeDark.primaryBackground,
                             style: const TextStyle(
                               color: AppThemeDark.textWhite,

@@ -10,6 +10,7 @@ import '../providers/navigation_provider.dart';
 import '../shared/theme/app_theme.dart';
 import 'members/members_screen.dart';
 import 'reports/reports_screen.dart';
+import 'staff/staff_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -66,10 +67,11 @@ class _NavigationBody extends StatelessWidget {
         return const MembersScreen();
       case NavigationSection.subscriptions:
       case NavigationSection.payments:
-        return PaymentsScreen();
+        return const PaymentsScreen();
       case NavigationSection.staff:
+        return const StaffScreen();
       case NavigationSection.reports:
-        return ReportsScreen();
+        return const ReportsScreen();
     }
   }
 }

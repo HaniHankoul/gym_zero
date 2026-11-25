@@ -23,7 +23,7 @@ class CustomText extends StatelessWidget {
         color: color,
         fontSize: fontSize,
         fontWeight: fontWeight,
-        fontFamily: 'cairo',
+        fontFamily: 'quntico',
       ),
     );
   }

@@ -23,13 +23,20 @@ class HomeScreen extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: AppThemeDark.primaryBackground,
 
-        title: Text(
-          'GymZero',
-          style: TextStyle(
-            color: AppThemeDark.primary,
-            fontWeight: FontWeight.w700,
-            fontSize: 25,
-          ),
+        title: Row(
+          children: [
+            Icon(Icons.fitness_center, color: AppThemeDark.primary),
+            horizontalSpaceMedium(),
+            Text(
+              'GymZero',
+              style: TextStyle(
+                color: AppThemeDark.primary,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'shadow_light',
+                fontSize: 25,
+              ),
+            ),
+          ],
         ),
       ),
       backgroundColor: AppThemeDark.primaryBackground,

@@ -63,6 +63,7 @@ class NavigationElements extends ConsumerWidget {
                 title,
                 style: TextStyle(
                   color: isSelected ? Colors.black : Colors.white,
+                  fontFamily: 'quntico',
                 ),
               ),
             ],
